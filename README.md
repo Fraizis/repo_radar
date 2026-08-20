@@ -11,10 +11,37 @@ ELT-платформа для аналитики GitHub-репозиториев
 - **Визуализация:** Metabase
 
 ## Архитектура
-GitHub Archive → dlt → MinIO (bronze) → ClickHouse (silver) → dbt (gold) → Metabase
-GitHub API ─────────────────────────────┘
-OSV API ────────────────────────────────┘
-Playwright ─────────────────────────────┘
+
+┌─────────────────┐
+│ GitHub Archive  │───┐
+└─────────────────┘   │
+│
+┌─────────────────┐   │    ┌──────────┐    ┌──────────────┐    ┌─────────┐    ┌───────────┐
+│   GitHub API    │───┼───▶│   dlt    │───▶│ MinIO        │───▶│ ClickHouse│───▶│ Metabase  │
+└─────────────────┘   │    └──────────┘    │ (bronze)     │    │ (silver)  │    └───────────┘
+│                     └──────────────┘    └─────┬─────┘
+┌─────────────────┐   │                                               │
+│    OSV API      │───┘                                               │
+└─────────────────┘                                                   │
+│
+┌─────────────────┐                                            ┌──────▼──────┐
+│   Playwright    │───────────────────────────────────────────▶│     dbt     │
+│  (changelogs)   │                                            │   (gold)    │
+└─────────────────┘                                            └─────────────┘
+
+
+                ▲                                              
+                │                                              
+          ┌─────┴──────┐
+          │  Dagster   │ (оркестрация всего пайплайна)
+          └────────────┘
+
+
+## Слои данных (Medallion Architecture)
+
+- **Bronze (MinIO):** Сырые данные в Parquet (GitHub Archive, API responses, scraped HTML)
+- **Silver (ClickHouse):** Очищенные таблицы с типизацией и дедупликацией
+- **Gold (ClickHouse):** Агрегированные витрины данных для дашбордов
 
 
 ## Быстрый старт
@@ -25,13 +52,19 @@ make up
 
 # Запустить демо
 make demo
-Порты
-Dagster: http://localhost:3001
-Metabase: http://localhost:3000
-ClickHouse HTTP: http://localhost:8123
-MinIO Console: http://localhost:9001
-Статус
+```
 
-🚧 В разработке
+## Сервисы
 
+Сервис	URL	Описание
+Dagster	http://localhost:3001	UI оркестрации пайплайна
+Metabase	http://localhost:3000	Дашборды и визуализация
+MinIO Console	http://localhost:9001	Управление объектным хранилищем
+ClickHouse HTTP	http://localhost:8123	HTTP API аналитической БД
+
+## Статус проекта
+
+Текущая фаза: Фаза 1 — Фундамент
+
+Прогресс: П1 ✅ | П2 🚧 | П3 ⏳
 
