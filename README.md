@@ -10,61 +10,92 @@ ELT-платформа для аналитики GitHub-репозиториев
 - **Трансформации:** dbt
 - **Визуализация:** Metabase
 
-## Архитектура
+## 🏗️ Архитектура
 
-┌─────────────────┐
-│ GitHub Archive  │───┐
-└─────────────────┘   │
-│
-┌─────────────────┐   │    ┌──────────┐    ┌──────────────┐    ┌─────────┐    ┌───────────┐
-│   GitHub API    │───┼───▶│   dlt    │───▶│ MinIO        │───▶│ ClickHouse│───▶│ Metabase  │
-└─────────────────┘   │    └──────────┘    │ (bronze)     │    │ (silver)  │    └───────────┘
-│                     └──────────────┘    └─────┬─────┘
-┌─────────────────┐   │                                               │
-│    OSV API      │───┘                                               │
-└─────────────────┘                                                   │
-│
-┌─────────────────┐                                            ┌──────▼──────┐
-│   Playwright    │───────────────────────────────────────────▶│     dbt     │
-│  (changelogs)   │                                            │   (gold)    │
-└─────────────────┘                                            └─────────────┘
+### Medallion Architecture
 
 
-                ▲                                              
-                │                                              
-          ┌─────┴──────┐
-          │  Dagster   │ (оркестрация всего пайплайна)
-          └────────────┘
+GitHub Archive ──┐
+GitHub API ──────┤
+OSV API ─────────┼──> dlt ──> MinIO (bronze) ──> ClickHouse (silver) ──> dbt (gold) ──> Metabase
+Playwright ──────┘                    ↑                                        ↑
+└────────────── Dagster ─────────────────┘
 
 
-## Слои данных (Medallion Architecture)
+**Слои данных:**
+- **Bronze (MinIO):** Сырые данные в Parquet — immutable, партиционированные по дате
+- **Silver (ClickHouse):** Очищенные таблицы — deduplicated, типизированные, партиционированные
+- **Gold (ClickHouse + dbt):** Витрины данных — агрегаты, тренды, метрики для дашбордов
 
-- **Bronze (MinIO):** Сырые данные в Parquet (GitHub Archive, API responses, scraped HTML)
-- **Silver (ClickHouse):** Очищенные таблицы с типизацией и дедупликацией
-- **Gold (ClickHouse):** Агрегированные витрины данных для дашбордов
+---
 
+## 🚀 Быстрый старт
 
-## Быстрый старт
+### 1. Клонировать репозиторий
 
 ```bash
-# Поднять инфраструктуру
-make up
-
-# Запустить демо
-make demo
+git clone <repo-url>
+cd repo_radar
 ```
 
-## Сервисы
+### 2. Настроить переменные окружения
 
-Сервис	URL	Описание
-Dagster	http://localhost:3001	UI оркестрации пайплайна
-Metabase	http://localhost:3000	Дашборды и визуализация
-MinIO Console	http://localhost:9001	Управление объектным хранилищем
-ClickHouse HTTP	http://localhost:8123	HTTP API аналитической БД
+cp .env.example .env
+# Отредактировать .env — добавить GITHUB_TOKEN
 
-## Статус проекта
+### 3. Поднять инфраструктуру
 
-Текущая фаза: Фаза 1 — Фундамент
+make up
 
-Прогресс: П1 ✅ | П2 🚧 | П3 ⏳
+### 4. Установить Python-зависимости
+
+uv sync
+
+### 5. Запустить Dagster
+
+dagster dev -f src/definitions.py
+
+## 🔌 Порты сервисов
+
+Сервис	Порт	URL
+Dagster UI	3001	http://localhost:3001
+Metabase	3000	http://localhost:3000
+MinIO Console	9001	http://localhost:9001
+MinIO API	9002	http://localhost:9002
+ClickHouse HTTP	8123	http://localhost:8123
+ClickHouse TCP	9000	tcp://localhost:9000
+PostgreSQL	5433	postgresql://localhost:5433
+
+## 📦 Структура проекта
+
+repo_radar/
+├── config/
+│   ├── tracked_repos.yml      # ~300 репозиториев для отслеживания
+│   └── changelog_sources.yml  # URL для парсинга changelog
+├── infra/
+│   └── clickhouse/
+│       └── init/              # SQL-скрипты инициализации
+├── src/
+│   ├── definitions.py         # Dagster Definitions
+│   ├── assets/                # Dagster assets (bronze/silver/gold)
+│   ├── resources/             # Resources (ClickHouse, MinIO, GitHub)
+│   └── extractors/            # Логика извлечения данных
+├── transform/                 # dbt-проект (будет создан в П6)
+├── docker-compose.yml
+├── Makefile
+└── pyproject.toml
+
+## 🛠️ Технологический стек
+
+Компонент	Технология
+Оркестрация	Dagster
+Ingestion	dlt
+Storage (bronze)	MinIO (S3)
+Storage (OLAP)	ClickHouse
+Трансформации	dbt
+Визуализация	Metabase
+Scraping	Playwright
+Язык	Python 3.12
+Пакет-менеджер	uv
+
 

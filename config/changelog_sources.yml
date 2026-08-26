@@ -1,0 +1,46 @@
+# Источники changelog для парсинга
+# Будут использованы в П7 с Playwright
+
+sources:
+  - name: flask
+    url: https://flask.palletsprojects.com/en/latest/changes/
+    parser: html
+    selectors:
+      version: "h2"
+      date: "p.release-date"
+      content: "div.section"
+
+  - name: django
+    url: https://docs.djangoproject.com/en/stable/releases/
+    parser: html
+    selectors:
+      version: "h2 a"
+      date: "p.date"
+      content: "div.section"
+
+  - name: rust
+    url: https://github.com/rust-lang/rust/blob/master/RELEASES.md
+    parser: markdown
+    selectors:
+      version: "h2"
+      date: null
+      content: "ul"
+
+  - name: kubernetes
+    url: https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.30.md
+    parser: markdown
+    selectors:
+      version: "h2"
+      date: null
+      content: "ul"
+
+  - name: numpy
+    url: https://numpy.org/doc/stable/release.html
+    parser: html
+    selectors:
+      version: "h2"
+      date: "p.date"
+      content: "div.section"
+
+
+

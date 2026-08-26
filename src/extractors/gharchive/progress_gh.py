@@ -1,0 +1,89 @@
+import sys
+import time
+from typing import Callable, Optional
+
+ProgressCallback = Callable[[int, Optional[int]], None]
+
+
+def format_size(num_bytes: float) -> str:
+    """Человекочитаемый размер: 1536 → '1.5 KB'."""
+    value = float(num_bytes)
+    for unit in ("B", "KB", "MB", "GB"):
+        if abs(value) < 1024 or unit == "GB":
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} GB"
+
+
+def format_duration(seconds: float) -> str:
+    """Секунды → 'MM:SS' (или 'HH:MM:SS' для длинных загрузок)."""
+    if seconds != seconds or seconds in (float("inf"), float("-inf")):
+        return "--:--"
+    total = int(max(seconds, 0))
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f"{hours:d}:{minutes:02d}:{secs:02d}"
+    return f"{minutes:02d}:{secs:02d}"
+
+
+class ConsoleDownloadProgress:
+    """
+    Прогресс-бар скачивания без внешних зависимостей.
+
+    Использование как колбэка: progress(downloaded_bytes, total_bytes).
+    По завершении вызвать close() — допишет перевод строки.
+    """
+
+    BAR_WIDTH = 30
+
+    def __init__(self, filename: str, min_interval: float = 0.2, stream=None):
+        self.filename = filename
+        self.stream = stream if stream is not None else sys.stdout
+        self.is_tty = hasattr(self.stream, "isatty") and self.stream.isatty()
+        self.min_interval = min_interval if self.is_tty else max(min_interval, 5.0)
+        self._started_at = time.monotonic()
+        self._last_render = 0.0
+        self._line_width = 0
+        self._dirty = False
+
+    def __call__(self, downloaded: int, total: Optional[int]) -> None:
+        now = time.monotonic()
+        is_final = total is not None and downloaded >= total
+        if not is_final and (now - self._last_render) < self.min_interval:
+            return
+        self._last_render = now
+
+        elapsed = max(now - self._started_at, 1e-6)
+        speed = downloaded / elapsed
+
+        if total:
+            fraction = min(downloaded / total, 1.0)
+            filled = int(self.BAR_WIDTH * fraction)
+            bar = "█" * filled + "░" * (self.BAR_WIDTH - filled)
+            eta = (total - downloaded) / speed if speed > 0 else float("inf")
+            line = (
+                f"   [{bar}] {fraction * 100:5.1f}%  "
+                f"{format_size(downloaded)} / {format_size(total)}  "
+                f"{format_size(speed)}/s  ETA {format_duration(eta)}"
+            )
+        else:
+            line = (
+                f"   ⬇️   {format_size(downloaded)}  "
+                f"{format_size(speed)}/s  {format_duration(elapsed)}"
+            )
+
+        prefix = "\r" if self.is_tty else ""
+        suffix = "" if self.is_tty else "\n"
+        self.stream.write(prefix + line.ljust(self._line_width) + suffix)
+        self.stream.flush()
+        self._line_width = max(self._line_width, len(line))
+        self._dirty = self.is_tty
+
+    def close(self) -> None:
+        if self._dirty:
+            self.stream.write("\n")
+            self.stream.flush()
+            self._dirty = False
+
+
