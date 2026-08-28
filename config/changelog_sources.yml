@@ -1,46 +1,40 @@
-# Источники changelog для парсинга
-# Будут использованы в П7 с Playwright
+# Источники changelog для парсинга (Playwright, П7)
+# version — CSS-селектор заголовков версий; date: null → дату берём из текста заголовка.
 
 sources:
   - name: flask
-    url: https://flask.palletsprojects.com/en/latest/changes/
+    url: https://flask.palletsprojects.com/en/stable/changes/
     parser: html
-    selectors:
-      version: "h2"
-      date: "p.release-date"
-      content: "div.section"
-
-  - name: django
-    url: https://docs.djangoproject.com/en/stable/releases/
-    parser: html
-    selectors:
-      version: "h2 a"
-      date: "p.date"
-      content: "div.section"
-
-  - name: rust
-    url: https://github.com/rust-lang/rust/blob/master/RELEASES.md
-    parser: markdown
     selectors:
       version: "h2"
       date: null
-      content: "ul"
 
-  - name: kubernetes
-    url: https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.30.md
-    parser: markdown
-    selectors:
-      version: "h2"
-      date: null
-      content: "ul"
-
-  - name: numpy
-    url: https://numpy.org/doc/stable/release.html
+  - name: jinja
+    url: https://jinja.palletsprojects.com/en/stable/changes/
     parser: html
     selectors:
       version: "h2"
-      date: "p.date"
-      content: "div.section"
+      date: null
 
+  - name: click
+    url: https://click.palletsprojects.com/en/stable/changes/
+    parser: html
+    selectors:
+      version: "h2"
+      date: null
+
+  - name: werkzeug
+    url: https://werkzeug.palletsprojects.com/en/stable/changes/
+    parser: html
+    selectors:
+      version: "h2"
+      date: null
+
+  - name: urllib3
+    url: https://urllib3.readthedocs.io/en/stable/changelog.html
+    parser: html
+    selectors:
+      version: "h2"
+      date: null
 
 

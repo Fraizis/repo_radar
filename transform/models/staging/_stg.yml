@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: stg_github_events
+    description: "Типизированный, дедуплицированный (FINAL) слой событий над silver_github_events."
+    columns:
+      - name: event_id
+        description: "Уникальный ID события GitHub Archive."
+        tests: [not_null, unique]
+      - name: event_type
+        tests: [not_null]
+      - name: repo_name
+        tests: [not_null]
+
+  - name: stg_repos
+    description: "Типизированный, дедуплицированный (FINAL) слой репозиториев над silver_repos."
+    columns:
+      - name: repo_name
+        tests: [not_null, unique]
+
+  - name: stg_advisories
+    description: "Типизированный, дедуплицированный (FINAL) слой уязвимостей над silver_advisories."
+    columns:
+      - name: vuln_id
+        tests: [not_null]
+      - name: repo_name
+        tests: [not_null]
+
+  - name: stg_changelogs
+    description: "Типизированный, дедуплицированный (FINAL) слой changelog'ов над silver_changelogs."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [source, version]
+    columns:
+      - name: source
+        tests: [not_null]
+      - name: version
+        tests: [not_null]
+

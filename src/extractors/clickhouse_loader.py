@@ -38,8 +38,111 @@ class ClickHouseLoader:
         )
         self.database = database
 
+    @staticmethod
+    def _to_naive_utc(col: str, dtype: pl.DataType) -> pl.Expr:
+        """Любой ISO datetime → naive UTC под колонку ClickHouse DateTime.
+
+        GraphQL/parquet могут принести:
+        * ``2024-01-15T10:30:00Z``
+        * ``2024-01-15T10:30:00+00:00``
+        * ``2024-01-15T10:30:00.123Z``
+        * уже Datetime (если распарсили в graphql-клиенте)
+        ``strict=False``: битая/пустая строка → null, а не exception.
+        """
+        if dtype == pl.String:
+            return (
+                pl.col(col)
+                .str.replace(r"[Zz]$", "+00:00")
+                .str.to_datetime(strict=False)
+                .dt.replace_time_zone(None)
+            )
+        return pl.col(col).dt.replace_time_zone(None)
+
+    @staticmethod  
+    def _prepare_silver_repos(df: pl.DataFrame) -> pl.DataFrame:
+        """Parquet → типы ``silver_repos``.
+        GraphQL отдаёт даты naive UTC; stars/forks — int; description может быть null.
+        """
+        exprs = []
+
+        if "repo_id" in df.columns:
+            exprs.append(pl.col("repo_id").fill_null(0).cast(pl.UInt64))
+        for col in ("repo_name", "owner", "name", "ecosystem", "package"):
+            if col in df.columns:
+                exprs.append(pl.col(col).fill_null("").cast(pl.String))
+        if "description" in df.columns:
+            exprs.append(pl.col("description").cast(pl.String))
+        if "language" in df.columns:
+            exprs.append(pl.col("language").cast(pl.String))
+        if "stars" in df.columns:
+            exprs.append(pl.col("stars").fill_null(0).cast(pl.UInt64))
+        if "forks" in df.columns:
+            exprs.append(pl.col("forks").fill_null(0).cast(pl.UInt64)) 
+
+        for col in ("pushed_at", "updated_at", "created_at"):
+            if col not in df.columns:
+                continue
+            exprs.append(ClickHouseLoader._to_naive_utc(col, df.schema[col]))
+            
+        return df.with_columns(exprs) if exprs else df
+
+    @staticmethod 
+    def _prepare_silver_advisories(df: pl.DataFrame) -> pl.DataFrame:
+        """Parquet → типы ``silver_advisories``.
+        Строковые поля с fill_null(''); опциональные — просто cast(String);
+        даты published/modified → naive UTC через общий ``_to_naive_utc``.
+        """
+        exprs = []
+
+        for col in ("vuln_id", "repo_name", "package"):
+            if col in df.columns:
+                exprs.append(pl.col(col).fill_null("").cast(pl.String))
+        if "ecosystem" in df.columns:
+            exprs.append(pl.col("ecosystem").fill_null("unknown").cast(pl.String))
+        if "severity" in df.columns:
+            exprs.append(pl.col("severity").fill_null("UNKNOWN").cast(pl.String))
+        for col in ("cve_id", "aliases", "summary", "cvss_vector"):
+            if col in df.columns:
+                exprs.append(pl.col(col).cast(pl.String))
+
+        for col in ("published", "modified"):
+            if col in df.columns:
+                exprs.append(ClickHouseLoader._to_naive_utc(col, df.schema[col]))
+
+        return df.with_columns(exprs) if exprs else df
+
+    @staticmethod
+    def _prepare_silver_changelogs(df: pl.DataFrame) -> pl.DataFrame:
+        """Parquet → типы silver_changelogs.
+        Строковые ключи с fill_null(''); heading опционален;
+        release_date/scraped_at → naive UTC через общий _to_naive_utc."""
+        exprs = []
+
+        for col in ("source", "url", "version"):
+            if col in df.columns:
+                exprs.append(pl.col(col).fill_null("").cast(pl.String))
+        if "heading" in df.columns:
+            exprs.append(pl.col("heading").cast(pl.String))
+
+        for col in ("release_date", "scraped_at"):
+            if col in df.columns:
+                exprs.append(ClickHouseLoader._to_naive_utc(col, df.schema[col]))
+
+        return df.with_columns(exprs) if exprs else df
+
     @staticmethod 
     def _prepare_silver_github_events(df: pl.DataFrame) -> pl.DataFrame:
+        """Приводит parquet-колонки к типам таблицы ``silver_github_events``.
+        Нужен, потому что Polars из parquet даёт более широкие типы, чем CH:
+        ``event_time`` — ISO-строка ``YYYY-MM-DDTHH:MM:SSZ`` → naive datetime;
+        id-поля — Int с null → UInt + fill_null; ``public`` / ``pr_merged`` → UInt8.
+        Колонки, которых нет в DataFrame, пропускаются (sample/частичный файл).
+        ``strict=False`` на опциональных полях: невалидные значения → null, а не exception.
+        Args:
+            df: DataFrame после ``pl.read_parquet``.
+        Returns:
+            Тот же df с ``with_columns``; без изменений, если ни одной известной колонки нет.
+        """
         exprs = []
 
         if "event_id" in df.columns:
@@ -92,6 +195,7 @@ class ClickHouseLoader:
         parquet_path: Path,
         table_name: str,
         drop_partition: Optional[str] = None,
+        optimize_final: bool = False
     ) -> int:
         """
         Загрузить Parquet файл в таблицу ClickHouse
@@ -113,7 +217,14 @@ class ClickHouseLoader:
             print(f"   ⚠️  Parquet пустой: {parquet_path}")
             return 0
 
-        df = self._prepare_silver_github_events(df)
+        if table_name == "silver_github_events":
+            df = self._prepare_silver_github_events(df)
+        elif table_name == "silver_repos":
+            df = self._prepare_silver_repos(df)
+        elif table_name == "silver_advisories": 
+            df = self._prepare_silver_advisories(df)
+        elif table_name == "silver_changelogs":
+            df = self._prepare_silver_changelogs(df)
 
         if drop_partition:
             partition_id = drop_partition
@@ -129,6 +240,12 @@ class ClickHouseLoader:
             data=df.rows(),
             column_names=list(df.columns),
         )
+
+        if optimize_final:
+            print(f"   🔧 OPTIMIZE TABLE {table_name} FINAL")
+            self.client.command(
+                f"OPTIMIZE TABLE {self.database}.{table_name} FINAL"
+            )
         
         print(f"   ✓ Загружено {df.height} строк")
         

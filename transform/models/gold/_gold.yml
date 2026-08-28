@@ -1,0 +1,51 @@
+version: 2
+
+models:
+  - name: gold_repo_daily
+    description: "Ежедневные метрики активности по репозиториям (stars/forks/pushes/PR/issues/releases)."
+    columns:
+      - name: event_date
+        description: "Дата события (UTC)."
+        tests: [not_null]
+      - name: repo_name
+        description: "owner/name репозитория."
+        tests: [not_null]
+      - name: total_events
+        description: "Всего событий за день."
+        tests: [not_null]
+
+  - name: gold_language_trends
+    description: "Популярность языков по дням: активные репо и активность по типам событий."
+    columns:
+      - name: event_date
+        tests: [not_null]
+      - name: language
+        description: "Язык из silver_repos, 'Unknown' если не найден."
+        tests: [not_null]
+
+  - name: gold_rising_repos
+    description: "Репозитории с наибольшим приростом Watch/Fork за последние 7 дней."
+    columns:
+      - name: repo_name
+        tests: [not_null, unique]
+      - name: growth_score
+        description: "Watch + Fork за окно 7 дней."
+        tests: [not_null]
+
+  - name: gold_cve_exposure
+    description: "Экспозиция репозиториев к уязвимостям OSV: severity, CVE, язык, звёзды."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+         arguments:
+          combination_of_columns:
+            - repo_name
+            - package
+            - vuln_id
+    columns:
+      - name: repo_name
+        tests: [not_null]
+      - name: vuln_id
+        tests: [not_null]
+      - name: severity
+        tests: [not_null] 
+      

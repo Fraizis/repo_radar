@@ -1,7 +1,16 @@
+"""
+Прогресс скачивания GH Archive без сторонних библиотек.
+
+``ProgressCallback`` — любой callable ``(downloaded: int, total: Optional[int])``.
+``ConsoleDownloadProgress`` рисует бар в TTY (``\\r``) и редкие строки, если stdout
+не терминал. ``close()`` печатает перевод строки после последнего ``\\r``.
+"""
+
 import sys
 import time
 from typing import Callable, Optional
 
+"""Сигнатура колбэка прогресса: (скачано байт, ожидаемый размер или None)."""
 ProgressCallback = Callable[[int, Optional[int]], None]
 
 
@@ -30,9 +39,14 @@ def format_duration(seconds: float) -> str:
 class ConsoleDownloadProgress:
     """
     Прогресс-бар скачивания без внешних зависимостей.
-
-    Использование как колбэка: progress(downloaded_bytes, total_bytes).
-    По завершении вызвать close() — допишет перевод строки.
+    Использование как колбэка: ``progress(downloaded_bytes, total_bytes)``.
+    По завершении вызвать ``close()`` — допишет перевод строки в TTY.
+    Args:
+        filename: Имя файла в логах (сейчас не печатается в строке бара,
+            но хранится для идентификации).
+        min_interval: Минимальный интервал перерисовки, сек. Для не-TTY
+            принудительно не меньше 5 сек, чтобы не спамить логи.
+        stream: Куда писать (по умолчанию ``sys.stdout``).
     """
 
     BAR_WIDTH = 30
@@ -48,6 +62,12 @@ class ConsoleDownloadProgress:
         self._dirty = False
 
     def __call__(self, downloaded: int, total: Optional[int]) -> None:
+        """Обновить бар. Троттлится по ``min_interval``, кроме финального тика.
+        Args:
+            downloaded: Уже скачанные байты.
+            total: Ожидаемый размер из ``Content-Length``, либо ``None``
+                (тогда бар без процента и ETA).
+        """
         now = time.monotonic()
         is_final = total is not None and downloaded >= total
         if not is_final and (now - self._last_render) < self.min_interval:
@@ -81,6 +101,9 @@ class ConsoleDownloadProgress:
         self._dirty = self.is_tty
 
     def close(self) -> None:
+        """Если последняя отрисовка была через ``\\r``, печатает ``\\n``.
+        Идемпотентен: повторный вызов ничего не делает.
+        """
         if self._dirty:
             self.stream.write("\n")
             self.stream.flush()

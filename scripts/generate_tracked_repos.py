@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import time
 
-from dotenv import load_dotenv  # pip install python-dotenv
+from dotenv import load_dotenv 
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -76,6 +76,16 @@ def fetch_top_repos(language: str, per_page: int = 100, max_pages: int = 1) -> l
 
 
 def extract_package_name(repo: dict) -> str:
+    """Эвристика имени пакета в экосистеме по языку репозитория.
+        * Python — lowercase, ``_`` → ``-`` (ожидание PyPI-имени).
+        * Go — ``github.com/{owner}/{name}`` (module path).
+        * Rust и прочие — как Python (cargo crate ≈ имя репо).
+    Это не запрос к registry: для многих репо имя пакета не совпадает с GitHub.
+    Args:
+        repo: Элемент GitHub Search API (нужны ``name``, ``full_name``, ``language``).
+    Returns:
+        Строка для поля ``package`` в ``tracked_repos.yml``.
+    """
     name = repo["name"]
     full_name = repo["full_name"]
     language = repo.get("language") or ""
@@ -88,6 +98,10 @@ def extract_package_name(repo: dict) -> str:
 
 
 def main():
+    """Собирает топ-300 репо на Python, Go и Rust и пишет ``config/tracked_repos.yml``.
+    Сортирует объединённый список по звёздам, обрезает до 300, поле ``stars``
+    в YAML не сохраняет. Без ``GITHUB_TOKEN`` лимит Search API — 10 req/min.
+    """
     print("🔍 Собираем топ-300: 100 Python + 100 Go + 100 Rust\n")
     if GITHUB_TOKEN:
         print("✓ Используем GITHUB_TOKEN")

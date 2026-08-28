@@ -1,0 +1,36 @@
+version: 2
+
+sources:
+  - name: silver
+    database: repo_radar
+    schema: repo_radar
+    tables:
+      - name: silver_github_events
+        description: "События GitHub Archive (bronze → silver, ReplacingMergeTree)."
+        loaded_at_field: _loaded_at
+        freshness:
+          warn_after: { count: 24, period: hour }
+          error_after: { count: 72, period: hour }
+          
+      - name: silver_repos
+        description: "Снимок метаданных репозиториев (GraphQL → silver, ReplacingMergeTree)."
+        loaded_at_field: _loaded_at
+        freshness:
+          warn_after: { count: 24, period: hour }
+          error_after: { count: 72, period: hour }
+
+      - name: silver_advisories
+        description: "Уязвимости OSV.dev (bronze → silver, ReplacingMergeTree)."
+        loaded_at_field: _loaded_at
+        freshness:
+          warn_after: { count: 24, period: hour }
+          error_after: { count: 72, period: hour }
+
+      - name: silver_changelogs
+        description: "Changelog'и, спарсенные Playwright (bronze → silver, ReplacingMergeTree)."
+        loaded_at_field: _loaded_at
+        freshness:
+          warn_after: { count: 48, period: hour }
+          error_after: { count: 168, period: hour }
+
+

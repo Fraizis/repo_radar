@@ -1,3 +1,9 @@
+"""
+Скачивание почасовых архивов GitHub Archive (``https://data.gharchive.org``).
+Имена файлов: ``YYYY-MM-DD-H.json.gz`` (час без ведущего нуля, как у GH Archive).
+Загрузка атомарная: пишется ``*.json.gz.part``, затем rename. Повреждённый
+готовый файл удаляется и качается заново.
+"""
 import gzip
 from datetime import datetime
 from pathlib import Path
@@ -16,16 +22,34 @@ USER_AGENT = "repo-radar/0.1 (gharchive downloader)"
 
 
 def archive_filename(dt: datetime) -> str:
+    """Имя hourly-архива GH Archive для заданного часа.
+    Args:
+        dt: Момент времени; учитываются год, месяц, день и ``hour``.
+    Returns:
+        Строка вида ``2026-08-26-12.json.gz``.
+    """
+
     return f"{dt:%Y-%m-%d}-{dt.hour}.json.gz"
 
 
 class GitHubArchiveDownloader:
+     """Качает ``.json.gz`` с data.gharchive.org в локальный каталог.
+    Args:
+        download_dir: Каталог для архивов. Создаётся при инициализации.
+    """
+
     def __init__(self, download_dir: Path):
         self.download_dir = download_dir
         self.download_dir.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def is_valid_archive(archive_path: Path) -> bool:
+        """Проверяет, что файл — целый gzip (читается до EOF без ошибок).
+        Args:
+            archive_path: Путь к ``.json.gz``.
+        Returns:
+            ``True``, если gzip валиден; ``False`` при EOF / BadGzipFile / OSError.
+        """
         try:
             with gzip.open(archive_path, "rb") as archive:
                 while archive.read(1024 * 1024):
@@ -36,6 +60,13 @@ class GitHubArchiveDownloader:
 
     @staticmethod
     def parse_content_length(raw_value: Optional[str]) -> Optional[int]:
+         """Парсит заголовок ``Content-Length`` в положительное число байт.
+        Args:
+            raw_value: Сырое значение заголовка или ``None``.
+        Returns:
+            Размер в байтах, либо ``None`` если заголовок пустой, нечисловой
+            или ``<= 0``.
+        """
         if not raw_value:
             return None
         try:
@@ -49,6 +80,26 @@ class GitHubArchiveDownloader:
         dt: datetime,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> Path:
+        """Скачивает архив за час ``dt``. Пропускает файл, если он уже валиден.
+        Алгоритм:
+            1. Если ``{filename}`` существует и gzip цел — вернуть его.
+            2. Если файл битый — удалить и качать заново.
+            3. Писать во временный ``{filename}.part``.
+            4. Сверить размер с ``Content-Length`` (если есть) и gzip-целостность.
+            5. ``replace`` part → итоговый файл.
+        Args:
+            dt: Час архива.
+            progress_callback: ``callback(downloaded_bytes, total_bytes | None)``.
+                По умолчанию ``ConsoleDownloadProgress``. Если у объекта есть
+                ``close()``, он вызывается в ``finally``.
+        Returns:
+            Путь к локальному ``.json.gz``.
+        Raises:
+            FileNotFoundError: Сервер ответил 404 (час ещё не опубликован
+                или URL неверный).
+            EOFError: Обрыв загрузки или повреждённый gzip.
+            httpx.HTTPStatusError: Другие HTTP-ошибки (не 404).
+        """
         filename = archive_filename(dt)
         url = f"{BASE_URL}/{filename}"
 

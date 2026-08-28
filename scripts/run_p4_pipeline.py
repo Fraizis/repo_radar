@@ -20,6 +20,14 @@ load_dotenv()
 
 
 def main():
+    """Локальный прогон П4 без Dagster: GH Archive → bronze parquet → ClickHouse.
+    Берёт вчера 12:00, качает час, фильтрует seed, пишет parquet (+ MinIO),
+    затем ``DROP PARTITION`` + INSERT в ``silver_github_events``.
+    Нужны поднятые MinIO и ClickHouse (``make up``) и ``tracked_repos.yml``.
+    При 0 событий после фильтра или ошибке коннекта к CH — ранний ``return``.
+    В конце печатает проверочный SQL по ``event_type`` за этот день.
+    """
+    
     print("\n" + "=" * 70)
     print("🚀 П4 Pipeline: GitHub Archive → bronze → silver_github_events")
     print("=" * 70 + "\n")

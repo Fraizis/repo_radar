@@ -112,14 +112,14 @@ Dagster (оркестрация)
 ### П5. GitHub GraphQL → silver_repos
 
 **Задачи:**
-- [ ] dlt-source для GitHub GraphQL API:
+- [x] dlt-source для GitHub GraphQL API:
   - Поля: stars, language, forks, pushedAt, description
   - По списку из seed
-- [ ] Rate limit handling + пагинация
-- [ ] Сохранить в MinIO (bronze)
-- [ ] Загрузить в `silver_repos`:
+- [x] Rate limit handling + пагинация
+- [x] Сохранить в MinIO (bronze)
+- [x] Загрузить в `silver_repos`:
   - Engine: ReplacingMergeTree по `updated_at`
-- [ ] Использовать `GITHUB_TOKEN` из `.env`
+- [x] Использовать `GITHUB_TOKEN` из `.env`
 
 **DoD:** ✅ Таблица `silver_repos` заполнена, повторный прогон обновляет записи без дублей.
 
@@ -130,18 +130,18 @@ Dagster (оркестрация)
 ### П6. dbt: silver → gold
 
 **Задачи:**
-- [ ] Создать dbt-проект в `transform/`
-- [ ] Staging-модели (views) на silver-таблицы
-- [ ] Gold-модели:
+- [x] Создать dbt-проект в `transform/`
+- [x] Staging-модели (views) на silver-таблицы
+- [x] Gold-модели:
   - `gold_repo_daily` — метрики по дням (stars/forks/pushes/PRs)
   - `gold_language_trends` — популярность языков
   - `gold_rising_repos` — прирост Watch/Fork за 7 дней
-- [ ] dbt-тесты:
+- [x] dbt-тесты:
   - `not_null` на ключевые поля
   - `unique` на `event_id`
   - freshness-проверки
-- [ ] Документация моделей (`dbt docs`)
-- [ ] Заглушка для `gold_cve_exposure` (реальная реализация в П7)
+- [x] Документация моделей (`dbt docs`)
+- [x] Заглушка для `gold_cve_exposure` (реальная реализация в П7)
 
 **DoD:** ✅ `dbt build` проходит без ошибок, витрины отвечают на SELECT-запросы.
 
@@ -152,16 +152,16 @@ Dagster (оркестрация)
 ### П7. OSV API + Playwright changelogs
 
 **Задачи OSV:**
-- [ ] Интеграция OSV API для уязвимостей (ecosystem/package из seed)
-- [ ] Сохранение в bronze (MinIO)
-- [ ] Загрузка в `silver_advisories`
-- [ ] dbt-модель `gold_cve_exposure`
+- [x] Интеграция OSV API для уязвимостей (ecosystem/package из seed)
+- [x] Сохранение в bronze (MinIO)
+- [x] Загрузка в `silver_advisories`
+- [x] dbt-модель `gold_cve_exposure`
 
 **Задачи Playwright:**
-- [ ] Парсинг changelog по URL из `config/changelog_sources.yml`
-- [ ] Извлечение: version, date, headings
-- [ ] Загрузка в `silver_changelogs`
-- [ ] Соблюдение robots.txt, backoff, checkpoint по URL
+- [x] Парсинг changelog по URL из `config/changelog_sources.yml`
+- [x] Извлечение: version, date, headings
+- [x] Загрузка в `silver_changelogs`
+- [x] Соблюдение robots.txt, backoff, checkpoint по URL
 
 **DoD:** ✅ Обе таблицы в ClickHouse заполнены, dbt-модель CVE работает, минимум 3 changelog реально спарсены.
 
@@ -290,9 +290,9 @@ repo-radar/
 - [x] **П2** — Инфраструктура поднимается
 - [x] **П3** — Python-каркас готов
 - [x] **П4** — GitHub Archive → ClickHouse
-- [ ] **П5** — GitHub GraphQL → ClickHouse
-- [ ] **П6** — dbt-модели работают
-- [ ] **П7** — OSV + Playwright интегрированы
+- [x] **П5** — GitHub GraphQL → ClickHouse
+- [x] **П6** — dbt-модели работают
+- [x] **П7** — OSV + Playwright интегрированы
 - [ ] **П8** — Dagster оркестрирует весь пайплайн
 - [ ] **П9** — Демо готово, проект в резюме
 

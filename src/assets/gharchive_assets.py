@@ -21,28 +21,23 @@ def bronze_gharchive(
     context: AssetExecutionContext,
     minio: MinIOResource,
     ) -> Output[dict]:
-    """
-    Asset: Извлечение событий из GitHub Archive
-
-    Действия:
-    1. Скачать hourly архив .json.gz
-    2. Фильтровать по tracked_repos и типам событий
-    3. Трансформировать в плоскую структуру
-    4. Сохранить в Parquet (bronze/gharchive/dt=YYYY-MM-DD/hour=HH/)
-    5. Сохранить один raw sample для документации
-
+    """Извлечение событий из GitHub Archive в bronze (Parquet + MinIO).
+    Сейчас час захардкожен: вчера, 12:00 (локальное время процесса).
+    Партиции Dagster ещё нет — в production ``target_dt`` должен приходить
+    из partition key.
+    Args:
+        context: Контекст исполнения (логи, метаданные).
+        minio: Ресурс bronze-пути и S3-клиента.
     Returns:
-        dict: Метаданные (datetime, events_count, parquet_path)
+        ``Output`` со словарём экстрактора (``datetime``, ``events_count``,
+        ``parquet_path``, ``sample_path``) и metadata для UI Dagster.
     """
 
-    # Дата для обработки (по умолчанию — вчера в 12:00)
-    # В production это будет параметризоваться через партиции
     target_dt = datetime.now() - timedelta(days=1)
     target_dt = target_dt.replace(hour=12, minute=0, second=0, microsecond=0)
 
     context.log.info(f"Обработка GitHub Archive за {target_dt.strftime('%Y-%m-%d %H:00')}")
 
-    # Инициализация экстрактора
     project_root = Path(__file__).parent.parent.parent
     extractor = GitHubArchiveExtractor(
         tracked_repos_path=project_root / "config" / "tracked_repos.yml",
@@ -73,32 +68,29 @@ def bronze_gharchive(
 @asset(
 group_name="github_archive",
 description="Загрузка событий из bronze (Parquet) → silver_github_events (ClickHouse)",
-deps=[bronze_gharchive],  # Зависимость от предыдущего asset
 )
 def silver_github_events(
     context: AssetExecutionContext,
     clickhouse: ClickHouseResource,
     bronze_gharchive: dict,
     ) -> Output[int]:
-    """
-    Asset: Загрузка данных в ClickHouse silver layer
-
-    Действия:
-    1. Прочитать Parquet из bronze
-    2. Удалить существующую партицию (идемпотентность)
-    3. Загрузить данные в silver_github_events
-    4. Проверить количество строк
-
+    """Загрузка parquet bronze в ``repo_radar.silver_github_events``.
+    Зависит от ``bronze_gharchive`` (``deps`` + входной аргумент).
+    Перед INSERT дропает дневную партицию ``YYYYMMDD``.
+    Args:
+        context: Контекст исполнения.
+        clickhouse: Креды CH; loader создаётся внутри.
+        bronze_gharchive: Output предыдущего asset (путь parquet и ``datetime``).
     Returns:
-        int: Количество загруженных строк
+        ``Output[int]`` — число загруженных строк плюс metadata
+        (``rows_loaded``, ``total_rows``, ``partition_id``, ``table``).
     """
-
+    
     parquet_path = Path(bronze_gharchive['parquet_path'])
     dt = bronze_gharchive['datetime']
 
     context.log.info(f"Загрузка {parquet_path} в ClickHouse...")
 
-    # Инициализация загрузчика
     with clickhouse.get_client() as client:
         loader = ClickHouseLoader(
             host=clickhouse.host,
@@ -108,7 +100,6 @@ def silver_github_events(
             database=clickhouse.database,
         )
 
-        # Загрузка с удалением партиции
         partition_id = dt.strftime("%Y%m%d")
         rows_loaded = loader.load_parquet_to_table(
             parquet_path=parquet_path,

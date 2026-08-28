@@ -1,3 +1,9 @@
+"""
+Оркестрация часа GitHub Archive: download → filter → transform → bronze parquet.
+Склеивает ``GitHubArchiveDownloader``, ``events_gh`` и ``GitHubArchiveBronzeWriter``.
+Загрузку в ClickHouse делает отдельно через ``load_to_clickhouse``.
+"""
+
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -16,8 +22,14 @@ RAW_SAMPLE_SIZE = 100
 
 
 class GitHubArchiveExtractor:
-    """Скачать час GH Archive → фильтр seed → parquet bronze."""
-
+    """Скачать час GH Archive → фильтр seed → parquet bronze.
+    При создании сразу читает ``tracked_repos.yml`` в память.
+    Args:
+        tracked_repos_path: YAML со списком репозиториев.
+        download_dir: Куда класть ``.json.gz``.
+        bronze_dir: Корень bronze (локальный диск).
+        object_store: Опциональный MinIO-клиент для зеркалирования parquet/sample.
+    """
     def __init__(
         self,
         tracked_repos_path: Path,
@@ -36,6 +48,24 @@ class GitHubArchiveExtractor:
         save_raw_sample: bool = True,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> dict:
+        """Полный цикл обработки одного часа архива.
+        Шаги:
+            1. Скачать (или переиспользовать) ``.json.gz``.
+            2. Прочитать события, попутно набрав raw sample.
+            3. Отфильтровать по seed и типам, трансформировать.
+            4. Записать parquet; опционально JSON-sample.
+        Args:
+            dt: Час для обработки (обычно вчера 12:00 UTC-локально, как в assets).
+            save_raw_sample: Писать ли JSON-sample первых ``RAW_SAMPLE_SIZE`` событий.
+            progress_callback: Прогресс скачивания; ``None`` → консольный бар.
+        Returns:
+            Словарь:
+                * ``datetime`` — исходный ``dt``
+                * ``events_count`` — число строк после фильтра
+                * ``parquet_path`` — путь к parquet или ``None``, если событий 0
+                * ``sample_path`` — путь к sample или ``None``
+        """
+
         print(f"\n{'=' * 60}")
         print(f"📦 GitHub Archive: {dt.strftime('%Y-%m-%d %H:00')}")
         print(f"{'=' * 60}")
@@ -81,6 +111,17 @@ class GitHubArchiveExtractor:
         }
 
     def load_to_clickhouse(self, parquet_path: Path, dt: datetime, ch_loader) -> int:
+        """Загружает parquet часа в ``silver_github_events`` с заменой партиции.
+        Партиция — ``YYYYMMDD`` из ``dt``. Перед INSERT выполняется
+        ``DROP PARTITION``, поэтому повторный прогон идемпотентен на уровне дня
+        (не часа: вся дневная партиция перезаписывается этим файлом).
+        Args:
+            parquet_path: Файл, который вернул ``process_hour``.
+            dt: Тот же час, что обрабатывали (для id партиции).
+            ch_loader: Экземпляр ``ClickHouseLoader``.
+        Returns:
+            Число вставленных строк.
+        """ 
         partition_id = dt.strftime("%Y%m%d")
         return ch_loader.load_parquet_to_table(
             parquet_path=parquet_path,
