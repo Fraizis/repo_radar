@@ -6,8 +6,8 @@
 """
 import gzip
 import json
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, Optional
 
 import yaml
 
@@ -34,7 +34,7 @@ def load_tracked_repos(tracked_repos_path: Path) -> set[str]:
     Returns:
         Множество полных имён, например ``{"pallets/flask", "gin-gonic/gin"}``.
     """
-    with open(tracked_repos_path, "r", encoding="utf-8") as f:
+    with open(tracked_repos_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     repos = set()
@@ -66,7 +66,7 @@ def read_events(archive_path: Path) -> Iterator[dict]:
 def filter_events(
     events: Iterator[dict],
     tracked_repos: set[str],
-    allowed_types: Optional[set[str]] = None,
+    allowed_types: set[str] | None = None,
 ) -> Iterator[dict]:
     """Оставляет события нужных типов по отслеживаемым репозиториям.
     Репозиторий берётся из ``event["repo"]["name"]`` (формат ``owner/name``).
@@ -112,7 +112,16 @@ def transform_event(event: dict) -> dict:
         "repo_id": event.get("repo", {}).get("id"),
         "repo_name": event.get("repo", {}).get("name"),
         "public": event.get("public", True),
-    }
+        "pr_action": None,
+        "pr_number": None,
+        "pr_merged": None,
+        "issue_action": None,
+        "issue_number": None,
+        "push_size": None,
+        "push_ref": None,
+        "release_tag": None,
+        "release_name": None,
+        }
 
     payload = event.get("payload", {})
     event_type = event.get("type")

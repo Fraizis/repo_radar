@@ -11,9 +11,8 @@ from __future__ import annotations
 
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 from urllib import robotparser
 from urllib.parse import urlsplit
 
@@ -44,12 +43,12 @@ _DATE_FORMATS = (
 
 def load_changelog_sources(config_path: Path) -> list[dict]:
     """Читает config/changelog_sources.yml → список источников (name/url/selectors)."""
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     return list(data.get("sources") or [])
 
 
-def _clean_version(text: Optional[str]) -> Optional[str]:
+def _clean_version(text: str | None) -> str | None:
     """Из заголовка 'Version 3.1.0 (2024-...)' достаёт '3.1.0'."""
     if not text:
         return None
@@ -57,7 +56,7 @@ def _clean_version(text: Optional[str]) -> Optional[str]:
     return m.group(0) if m else None
 
 
-def _parse_date(text: Optional[str]) -> Optional[datetime]:
+def _parse_date(text: str | None) -> datetime | None:
     """Пытается распарсить дату несколькими форматами → naive UTC (как в П4/П5)."""
     if not text:
         return None
@@ -68,7 +67,7 @@ def _parse_date(text: Optional[str]) -> Optional[datetime]:
         for fmt in _DATE_FORMATS:
             try:
                 dt = datetime.strptime(cand, fmt)
-                return dt.replace(tzinfo=timezone.utc).replace(tzinfo=None)
+                return dt.replace(tzinfo=UTC).replace(tzinfo=None)
             except ValueError:
                 continue
     return None
@@ -81,9 +80,9 @@ class ChangelogScraper:
         self.timeout_ms = timeout_ms
         self._pw = None
         self._browser = None
-        self._robots_cache: dict[str, Optional[robotparser.RobotFileParser]] = {}
+        self._robots_cache: dict[str, robotparser.RobotFileParser | None] = {}
 
-    def __enter__(self) -> "ChangelogScraper":
+    def __enter__(self) -> ChangelogScraper:
         self._pw = sync_playwright().start()
         self._browser = self._pw.chromium.launch(headless=True)
         return self
@@ -159,8 +158,8 @@ class ChangelogScraper:
                 page.wait_for_selector(version_sel, timeout=self.timeout_ms)
             except PWTimeout:
                 print(f"   ⚠️  '{name}': селектор '{version_sel}' не появился")
-                
-            scraped_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+            scraped_at = datetime.now(UTC).replace(tzinfo=None)
             rows = self._extract(page, name, url, version_sel, date_sel, scraped_at)
             print(f"   ✓ '{name}': {len(rows)} версий")
             return rows

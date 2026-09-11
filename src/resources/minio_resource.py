@@ -1,27 +1,16 @@
-"""
-MinIO / S3 resource для bronze-слоя.
-Два уровня:
-    * ``MinioStore`` — низкоуровневый клиент (``minio.Minio``): бакет + ``put_file``.
-    * ``MinIOResource`` — Dagster ConfigurableResource: креды из env и локальный
-      путь bronze, который используют assets.
-"""
+from __future__ import annotations
 
+import io
 from pathlib import Path
 
+import polars as pl
 from dagster import ConfigurableResource
 from minio import Minio
+from minio.error import S3Error
 from pydantic import Field
 
 
 class MinioStore:
-    """S3-клиент MinIO: бакет bronze, загрузка локального файла по ключу.
-    Args:
-        endpoint: Хост:порт API, без схемы (например ``localhost:9002``).
-        access_key: Access key (``MINIO_ROOT_USER``).
-        secret_key: Secret key (``MINIO_ROOT_PASSWORD``).
-        bucket: Имя бакета, по умолчанию ``bronze``.
-        secure: ``True`` для HTTPS. Локальный docker-compose обычно ``False``.
-    """
     def __init__(
         self,
         endpoint: str,
@@ -37,6 +26,44 @@ class MinioStore:
             secret_key=secret_key,
             secure=secure,
         )
+
+    def put_bytes(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
+        self.ensure_bucket()
+        data_stream = io.BytesIO(data)
+        self.client.put_object(
+            self.bucket,
+            key,
+            data_stream,
+            length=len(data),
+            content_type=content_type,
+        )
+        uri = f"s3://{self.bucket}/{key}"
+        print(f"   ✓ MinIO ← {uri}")
+        return uri
+
+    def get_bytes(self, key: str) -> bytes:
+        response = self.client.get_object(self.bucket, key)
+        try:
+            return response.read()
+        finally:
+            response.close()
+            response.release_conn()
+
+    def get_uri(self, key: str) -> str:
+        return f"s3://{self.bucket}/{key}"
+
+    def exists(self, key: str) -> bool:
+        try:
+            self.client.stat_object(self.bucket, key)
+            return True
+        except S3Error:
+            return False
+
+    def put_dataframe(self, key: str, df: pl.DataFrame) -> str:
+        buf = io.BytesIO()
+        df.write_parquet(buf, compression="snappy")
+        buf.seek(0)
+        return self.put_bytes(key, buf.getvalue(), content_type="application/octet-stream")
 
     def ensure_bucket(self) -> None:
         """Создаёт бакет, если его ещё нет. Идемпотентно."""
@@ -59,32 +86,20 @@ class MinioStore:
 
 
 class MinIOResource(ConfigurableResource):
-    """Dagster-ресурс: креды MinIO + локальный каталог bronze.
-    Поля читаются из Definitions / env (см. ``src/definitions.py``).
-    Assets берут диск через ``get_bronze_path()`` и S3 через ``get_store()``.
-    """
-
     endpoint: str = Field(default="localhost:9002")
     access_key: str = Field(default="minioadmin")
     secret_key: str = Field(default="minioadmin123")
     bucket: str = Field(default="bronze")
     secure: bool = Field(default=False)
-    bronze_path: str = Field(default="./data/bronze")
-
-    def get_bronze_path(self) -> Path:
-        """Локальный корень bronze. Создаёт каталог, если его нет.
-        Returns:
-            ``Path`` к ``bronze_path``.
-        """
-        path = Path(self.bronze_path)
-        path.mkdir(parents=True, exist_ok=True)
-        return path
 
     def get_store(self) -> MinioStore:
         """Собирает ``MinioStore`` из полей ресурса.
         Returns:
             Клиент для ``put_file`` из bronze-writer.
         """
+        if not self.access_key or not self.secret_key:
+            raise ValueError("MINIO_ROOT_USER / MINIO_ROOT_PASSWORD не заданы")
+
         return MinioStore(
             endpoint=self.endpoint,
             access_key=self.access_key,
