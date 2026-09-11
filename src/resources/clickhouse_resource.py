@@ -1,13 +1,8 @@
-"""
-Dagster-ресурс подключения к ClickHouse (HTTP-интерфейс, порт 8123).
-Не путать с ``ClickHouseLoader``: resource отдаёт сырой ``clickhouse_connect``
-клиент и креды; loader умеет parquet → INSERT и DROP PARTITION.
-"""
+from contextlib import contextmanager
 
+import clickhouse_connect
 from dagster import ConfigurableResource
 from pydantic import Field
-import clickhouse_connect
-from contextlib import contextmanager
 
 
 class ClickHouseResource(ConfigurableResource):

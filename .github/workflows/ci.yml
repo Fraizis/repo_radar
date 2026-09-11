@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.12"
+
+      - name: Sync deps
+        run: uv sync --extra dev
+
+      - name: Ruff
+        run: uv run ruff check src tests scripts
+
+      - name: Pytest
+        env:
+          PYTHONPATH: src
+        run: uv run pytest -q
+
+      - name: dbt deps + parse
+        working-directory: transform
+        env:
+          CLICKHOUSE_HOST: localhost
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+          DBT_PROFILES_DIR: .
+        run: |
+          uv run --project .. dbt deps --profiles-dir .
+          uv run --project .. dbt parse --project-dir . --profiles-dir .
+
+

@@ -7,7 +7,6 @@
 import gzip
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import httpx
 
@@ -33,7 +32,7 @@ def archive_filename(dt: datetime) -> str:
 
 
 class GitHubArchiveDownloader:
-     """Качает ``.json.gz`` с data.gharchive.org в локальный каталог.
+    """Качает ``.json.gz`` с data.gharchive.org в локальный каталог.
     Args:
         download_dir: Каталог для архивов. Создаётся при инициализации.
     """
@@ -59,8 +58,8 @@ class GitHubArchiveDownloader:
             return False
 
     @staticmethod
-    def parse_content_length(raw_value: Optional[str]) -> Optional[int]:
-         """Парсит заголовок ``Content-Length`` в положительное число байт.
+    def parse_content_length(raw_value: str | None) -> int | None:
+        """Парсит заголовок ``Content-Length`` в положительное число байт.
         Args:
             raw_value: Сырое значение заголовка или ``None``.
         Returns:
@@ -78,7 +77,7 @@ class GitHubArchiveDownloader:
     def download_archive(
         self,
         dt: datetime,
-        progress_callback: Optional[ProgressCallback] = None,
+        progress_callback: ProgressCallback | None = None,
     ) -> Path:
         """Скачивает архив за час ``dt``. Пропускает файл, если он уже валиден.
         Алгоритм:
@@ -119,28 +118,28 @@ class GitHubArchiveDownloader:
         print(f"   ⬇️    Скачиваем: {url}")
 
         progress = progress_callback or ConsoleDownloadProgress(filename)
-
+        timeout = httpx.Timeout(connect=30.0, read=120.0, write=30.0, pool=30.0)
         try:
-            with httpx.stream(
-                "GET",
-                url,
-                timeout=300,
+            with httpx.Client(
+                http2=False,
+                timeout=timeout,
                 follow_redirects=True,
                 headers={"User-Agent": USER_AGENT},
-            ) as response:
-                response.raise_for_status()
+            ) as client:
+                with client.stream("GET", url) as response:
+                    response.raise_for_status()
 
-                total_size = self.parse_content_length(
-                    response.headers.get("Content-Length")
-                )
-                progress(0, total_size)
+                    total_size = self.parse_content_length(
+                        response.headers.get("Content-Length")
+                    )
+                    progress(0, total_size)
 
-                with open(temporary_path, "wb") as f:
-                    for chunk in response.iter_raw(chunk_size=256 * 1024):
-                        f.write(chunk)
-                        progress(response.num_bytes_downloaded, total_size)
+                    with open(temporary_path, "wb") as f:
+                        for chunk in response.iter_raw(chunk_size=256 * 1024):
+                            f.write(chunk)
+                            progress(response.num_bytes_downloaded, total_size)
 
-                total_bytes = response.num_bytes_downloaded
+                    total_bytes = response.num_bytes_downloaded
 
             if total_size is not None and total_bytes != total_size:
                 raise EOFError(
@@ -154,6 +153,7 @@ class GitHubArchiveDownloader:
             temporary_path.replace(output_path)
             print(f"   ✓ Скачано: {format_size(total_bytes)}")
             return output_path
+
 
         except httpx.HTTPStatusError as e:
             temporary_path.unlink(missing_ok=True)

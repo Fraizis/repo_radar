@@ -7,8 +7,8 @@ from pathlib import Path
 
 import dlt
 import yaml
-from extractors.github.graphql_client import GitHubGraphQLClient
 
+from extractors.github.graphql_client import GitHubGraphQLClient
 
 
 def load_seed_repos(tracked_repos_path: Path) -> list[dict]:
@@ -16,7 +16,7 @@ def load_seed_repos(tracked_repos_path: Path) -> list[dict]:
     В отличие от ``events_gh.load_tracked_repos`` (там set ``owner/name``),
     здесь нужны отдельные поля — GraphQL принимает owner и name по отдельности.
     """
-    with open(tracked_repos_path, "r", encoding="utf-8") as f:
+    with open(tracked_repos_path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     return list(data.get("repositories") or [])
 
@@ -42,8 +42,7 @@ def github_repos_source(
     def repos_resource():
         client = GitHubGraphQLClient(token=github_token, batch_size=batch_size)
         try:
-            for row in client.fetch_repos(repos):
-                yield row
+            yield from client.fetch_repos(repos)
         finally:
             client.close()
 

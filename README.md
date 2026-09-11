@@ -14,18 +14,12 @@ ELT-платформа для аналитики GitHub-репозиториев
 
 ### Medallion Architecture
 
+GitHub Archive ──┐ GitHub API ──────┤ OSV API ─────────┼──> extractors ──> MinIO (bronze parquet) Playwright ──────┘ │ │ │ ▼ Dagster ClickHouse S3Queue + MV │ │ │ ▼ │ silver_* (CH) │ │ └──────────> dbt ──> gold_* ──> Metabase
 
-GitHub Archive ──┐
-GitHub API ──────┤
-OSV API ─────────┼──> dlt ──> MinIO (bronze) ──> ClickHouse (silver) ──> dbt (gold) ──> Metabase
-Playwright ──────┘                    ↑                                        ↑
-└────────────── Dagster ─────────────────┘
-
-
-**Слои данных:**
-- **Bronze (MinIO):** Сырые данные в Parquet — immutable, партиционированные по дате
-- **Silver (ClickHouse):** Очищенные таблицы — deduplicated, типизированные, партиционированные
-- **Gold (ClickHouse + dbt):** Витрины данных — агрегаты, тренды, метрики для дашбордов
+**Слои:**
+- **Bronze (MinIO):** Parquet в object storage (без локального bronze на диске для пайплайна).
+- **Silver (ClickHouse):** S3Queue читает MinIO → MV пишет `silver_*` (Python INSERT в silver нет).
+- **Gold (dbt → ClickHouse):** `stg_*` / `gold_*` для Metabase.
 
 ---
 

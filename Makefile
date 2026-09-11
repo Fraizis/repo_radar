@@ -1,9 +1,11 @@
-.PHONY: setup up down logs ch ps restart clean build demo ch-sql ch-init p4 p5 p7_osv p7_changelog dbt-build dbt-test dbt-docs dbt-freshness
+.PHONY: setup up down logs ch ps restart clean build ch-sql ch-init pg-init dbt-build dbt-test dbt-docs dbt-freshness ci
 -include .env
 
 export
 CLICKHOUSE_USER ?= default
 CLICKHOUSE_PASSWORD ?= clickhouse123
+POSTGRES_USER ?= postgres
+POSTGRES_PASSWORD ?= postgres123
 
 export DBT_PROJECT_DIR = transform
 export DBT_PROFILES_DIR = transform
@@ -13,7 +15,9 @@ setup:
 	uv run playwright install --with-deps chromium
 
 up:
-	docker compose up -d --force-recreate clickhouse-migrate
+	docker compose up -d --wait minio clickhouse postgres
+	docker compose run --rm clickhouse-migrate
+	docker compose run --rm postgres-migrate
 	docker compose up -d
 
 down:
@@ -54,6 +58,17 @@ ch-init:
 	done
 	@echo "✅ ClickHouse initialized"
 
+pg-init:
+	@echo "🔧 Инициализация Postgres..."
+	@for file in infra/postgres/init/*.sql; do \
+		echo "   Выполняем: $$file"; \
+		docker exec -i \
+			-e PGPASSWORD=$(POSTGRES_PASSWORD) \
+			repo_radar_postgres psql \
+			-U $(POSTGRES_USER) -d postgres -f - < $$file; \
+	done
+	@echo "✅ Postgres initialized"
+
 dbt-build:
 	uv run dbt build
 
@@ -67,27 +82,22 @@ dbt-docs:
 dbt-freshness:
 	uv run dbt source freshness
 
-p4: 
-	uv run python scripts/run_p4_pipeline.py
+ci:
+	uv run ruff check src tests scripts
+	PYTHONPATH=src uv run pytest -q
+	cd transform && DBT_PROFILES_DIR=. uv run --project .. dbt parse --profiles-dir .
 
-p5:
-	uv run python scripts/run_p5_pipeline.py
-
-p7_osv:
-	uv run python scripts/run_p7_pipeline.py
-
-p7_changelog: 
-	uv run python scripts/run_p7_changelog_pipeline.py
-
-demo: up
-	@echo "⏳ Waiting for services to start..."
-	@sleep 15
-	@echo "✅ Services ready!"
-	@echo ""
-	@echo "📊 Dagster:        http://localhost:3001"
-	@echo "📈 Metabase:       http://localhost:3000"
-	@echo "🗄️  MinIO Console:  http://localhost:9001"
-	@echo "🔢 ClickHouse:     http://localhost:8123"
+urls:
+	@echo "======================================================================"
+	@echo "✅ RepoRadar готов. Сервисы и порты:"
+	@echo "======================================================================"
+	@echo "📈 Metabase:        http://localhost:3000"
+	@echo "📊 Dagster:         http://localhost:3001"
+	@echo "🗄️  MinIO Console:   http://localhost:9001"
+	@echo "🔌 MinIO API (S3):  http://localhost:9002"
+	@echo "🔢 ClickHouse HTTP: http://localhost:8123"
+	@echo "🐘 Postgres:        localhost:5433"
+	@echo "======================================================================"
 
 
 

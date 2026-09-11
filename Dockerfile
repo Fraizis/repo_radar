@@ -10,9 +10,13 @@ COPY src/ ./src/
 
 RUN uv pip install --system -e .
 
+RUN playwright install --with-deps chromium
+
 ENV DAGSTER_HOME=/app/.dagster
 
-CMD ["dagster", "dev", "-h", "0.0.0.0", "-p", "3000", "-f", "src/definitions.py"]
+RUN mkdir -p /app/.dagster
+
+CMD ["dagster", "dev", "-h", "0.0.0.0", "-p", "3001", "-f", "src/definitions.py"]
 
 
 

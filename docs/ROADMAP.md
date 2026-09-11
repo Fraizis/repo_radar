@@ -16,8 +16,7 @@
 ---
 
 ## 🏗️ Архитектура
-
-GitHub Archive → dlt → MinIO (bronze) → ClickHouse (silver) → dbt (gold) → Metabase
+источники → MinIO (bronze parquet) → ClickHouse S3Queue/MV (silver) → dbt (gold) → Metabase
 ↓                                      ↑
 GitHub API ────────────────────────────────┘
 ↓                                      ↑
@@ -172,20 +171,20 @@ Dagster (оркестрация)
 ### П8. Dagster assets + schedules
 
 **Задачи:**
-- [ ] Создать Dagster assets с зависимостями:
-  1. `bronze_gharchive` → `silver_github_events`
-  2. `bronze_github_repos` → `silver_repos`
-  3. `bronze_osv` → `silver_advisories`
-  4. `bronze_changelogs` → `silver_changelogs`
-  5. `dbt_build` (зависит от всех silver)
-- [ ] Asset checks:
+- [x] Создать Dagster assets с зависимостями:
+1. `bronze_gharchive` → S3Queue → `silver_github_events` (+ `silver_github_events_ready`)
+2. `bronze_github_repos` → S3Queue → `silver_repos` (+ `silver_repos_ready`)
+3. `bronze_osv` → S3Queue → `silver_advisories` (+ `silver_advisories_ready`)
+4. `bronze_changelogs` → S3Queue → `silver_changelogs` (+ `silver_changelogs_ready`)
+5. `dbt_build` (lineage от `*_ready`)
+- [x] Asset checks:
   - Row count > 0
   - Freshness (данные не старше X часов)
   - Аномалии объёма (vs медиана)
-- [ ] Schedules:
-  - GitHub Archive: каждый час
-  - GitHub GraphQL/OSV: каждые 6-12 часов
-  - Changelogs: раз в день
+- [x] Schedules:
+- GitHub Archive: каждый час (:15)
+- full_pipeline (repos/OSV/changelogs/dbt): раз в день 17:00
+- optimize silver snapshots: 04:30
 
 **DoD:** ✅ В Dagster UI виден lineage граф, один job запускает всю цепочку end-to-end.
 
@@ -196,22 +195,23 @@ Dagster (оркестрация)
 ### П9. Metabase, демо и документация
 
 **Задачи Metabase:**
-- [ ] Подключить к ClickHouse
-- [ ] Создать дашборды:
+- [x] Подключить к ClickHouse
+- [x] Создать дашборды:
   - **Repo Pulse** — события по дням и типам
   - **Rising Repos** — топ за 7 дней
   - **Language Trends** — популярность языков
   - **CVE Exposure** — репозитории с уязвимостями
 
+- [x] CI/CD: `ruff` + `dbt parse` + pytest
+
 **Задачи автоматизации:**
-- [ ] `make demo`: up + backfill 3 дня + dbt + вывод URL
 - [ ] Вывести порты: Metabase :3000, Dagster :3001, MinIO console :9001, MinIO API :9002, ClickHouse :8123, Postgres :5433
 
 **Задачи документации:**
 - [ ] Обновить README:
   - Архитектурная схема
   - Инструкции по запуску
-  - Скриншоты дашбордов
+  - Скриншоты дашбордов 
   - Блок "Что было бы в продакшене"
 - [ ] Формулировка для резюме:
   > "RepoRadar — ELT-платформа для аналитики GitHub-репозиториев (Dagster, dlt, dbt, ClickHouse): GitHub Archive + API + scraping → MinIO → medallion-архитектура, инкрементальная загрузка, тесты качества, дашборды Metabase"
@@ -261,8 +261,6 @@ repo-radar/
 - ❌ HeadHunter API
 
 **Возможные улучшения после v1:**
-- ClickHouse S3Queue для автоматической обработки
-- Алерты в Slack
 - CI/CD: `ruff` + `dbt parse` + pytest
 
 ---
@@ -293,7 +291,7 @@ repo-radar/
 - [x] **П5** — GitHub GraphQL → ClickHouse
 - [x] **П6** — dbt-модели работают
 - [x] **П7** — OSV + Playwright интегрированы
-- [ ] **П8** — Dagster оркестрирует весь пайплайн
+- [x] **П8** — Dagster оркестрирует весь пайплайн
 - [ ] **П9** — Демо готово, проект в резюме
 
 ---

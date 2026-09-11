@@ -1,6 +1,3 @@
-# Источники changelog для парсинга (Playwright, П7)
-# version — CSS-селектор заголовков версий; date: null → дату берём из текста заголовка.
-
 sources:
   - name: flask
     url: https://flask.palletsprojects.com/en/stable/changes/

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime, timezone
-from typing import Iterator, Optional
+from collections.abc import Iterator
+from datetime import UTC, datetime
 
 import httpx
 
@@ -40,13 +40,13 @@ def chunked(items: list, size: int) -> Iterator[list]:
         yield items[i : i + size]
 
 
-def _parse_github_dt(value: Optional[str]) -> Optional[datetime]:
+def _parse_github_dt(value: str | None) -> datetime | None:
     """ISO ``2024-01-15T10:30:00Z`` → naive UTC datetime (как в П4)."""
     if not value:
         return None
     dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if dt.tzinfo is not None:
-        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        dt = dt.astimezone(UTC).replace(tzinfo=None)
     return dt
 
 
@@ -113,7 +113,7 @@ class GitHubGraphQLClient:
         )
 
     def _post(self, query: str) -> dict:
-        last_exc: Optional[Exception] = None
+        last_exc: Exception | None = None
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 resp = self.http.post(
@@ -142,7 +142,7 @@ class GitHubGraphQLClient:
 
         raise RuntimeError(f"GraphQL не ответил после {MAX_RETRIES} попыток: {last_exc}")
 
-    def _maybe_wait_rate_limit(self, rate: Optional[dict]) -> None:
+    def _maybe_wait_rate_limit(self, rate: dict | None) -> None:
         if not rate:
             return
         remaining = int(rate.get("remaining") or 0)
@@ -150,7 +150,7 @@ class GitHubGraphQLClient:
         if remaining >= MIN_REMAINING_POINTS or not reset_at:
             return
         reset_dt = datetime.fromisoformat(reset_at.replace("Z", "+00:00"))
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         wait = max(0, (reset_dt - now).total_seconds()) + 1
         print(f"   ⏳ rateLimit remaining={remaining}, ждём {wait:.0f}s до {reset_at}")
         time.sleep(wait)
@@ -177,22 +177,22 @@ class GitHubGraphQLClient:
         return rows
 
     @staticmethod
-    def _transform(node: dict, seed: dict) -> Optional[dict]:
+    def _transform(node: dict, seed: dict) -> dict | None:
         created_at = _parse_github_dt(node.get("createdAt"))
         updated_at = _parse_github_dt(node.get("updatedAt")) or created_at
 
         repo_name = node.get("nameWithOwner") or f"{seed['owner']}/{seed['name']}"
-        
+
         if updated_at is None:
             print(f"   ⚠️  skip {repo_name}: нет updatedAt/createdAt")
             return None
 
         lang_obj = node.get("primaryLanguage") or {}
         language = lang_obj.get("name") or seed.get("language")
-        
+
         if language:
             language = str(language).lower()
-            
+
         return {
             "repo_id": node.get("databaseId") or 0,
             "repo_name": repo_name,

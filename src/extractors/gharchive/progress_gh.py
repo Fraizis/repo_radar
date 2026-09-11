@@ -8,10 +8,10 @@
 
 import sys
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 """Сигнатура колбэка прогресса: (скачано байт, ожидаемый размер или None)."""
-ProgressCallback = Callable[[int, Optional[int]], None]
+ProgressCallback = Callable[[int, int | None], None]
 
 
 def format_size(num_bytes: float) -> str:
@@ -61,7 +61,7 @@ class ConsoleDownloadProgress:
         self._line_width = 0
         self._dirty = False
 
-    def __call__(self, downloaded: int, total: Optional[int]) -> None:
+    def __call__(self, downloaded: int, total: int | None) -> None:
         """Обновить бар. Троттлится по ``min_interval``, кроме финального тика.
         Args:
             downloaded: Уже скачанные байты.
