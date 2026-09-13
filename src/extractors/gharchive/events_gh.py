@@ -9,7 +9,6 @@ import json
 from collections.abc import Iterator
 from pathlib import Path
 
-import yaml
 
 """Типы событий, которые попадают в bronze/silver. Остальные отбрасываются."""
 ALLOWED_EVENT_TYPES = {
@@ -20,27 +19,6 @@ ALLOWED_EVENT_TYPES = {
     "IssuesEvent",
     "PushEvent",
 }
-
-
-def load_tracked_repos(tracked_repos_path: Path) -> set[str]:
-    """Читает YAML со seed-репозиториями и возвращает множество ``owner/name``.
-    Ожидаемый формат::
-        repositories:
-          - owner: pallets
-            name: flask
-            ...
-    Args:
-        tracked_repos_path: Путь к ``config/tracked_repos.yml``.
-    Returns:
-        Множество полных имён, например ``{"pallets/flask", "gin-gonic/gin"}``.
-    """
-    with open(tracked_repos_path, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-
-    repos = set()
-    for repo in data.get("repositories", []):
-        repos.add(f"{repo['owner']}/{repo['name']}")
-    return repos
 
 
 def read_events(archive_path: Path) -> Iterator[dict]:

@@ -6,9 +6,13 @@ ClickHouse — отдельно через load_to_clickhouse (ReplacingMergeTre
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from extractors.changelog.bronze_changelog import ChangelogBronzeWriter
-from extractors.changelog.changelog_client import ChangelogScraper, load_changelog_sources
 from resources.minio_resource import MinioStore
+
+from config.changelog_sources import load_changelog_sources
+from extractors.changelog.changelog_client import ChangelogScraper
+from extractors.changelog.bronze_changelog import ChangelogBronzeWriter
+from extractors.changelog.checkpoint import ChangelogCheckpoint
+
 
 
 class ChangelogExtractor:
@@ -20,7 +24,8 @@ class ChangelogExtractor:
         skip_recent_hours: int = 24,
     ):
         self.sources = load_changelog_sources(sources_path)
-        self.bronze = ChangelogBronzeWriter(object_store, checkpoint_dir)
+        self.bronze = ChangelogBronzeWriter(object_store)
+        self.checkpoint_store = ChangelogCheckpoint(checkpoint_dir)
         self.skip_recent_hours = skip_recent_hours
 
     def _is_recent(self, checkpoint: dict, url: str) -> bool:
@@ -43,7 +48,7 @@ class ChangelogExtractor:
         print(f"   источников: {len(self.sources)}")
         print(f"{'=' * 60}")
 
-        checkpoint = self.bronze.load_checkpoint()
+        checkpoint = self.checkpoint_store.load()
         all_rows: list[dict] = []
         parsed_sources = 0
         scraped_urls: list[str] = []
@@ -72,7 +77,7 @@ class ChangelogExtractor:
             for r in all_rows:
                 counts[r["url"]] = counts.get(r["url"], 0) + 1
             for url in scraped_urls:
-                self.bronze.update_checkpoint(checkpoint, url, counts.get(url, 0))
+                self.checkpoint_store.update(checkpoint, url, counts.get(url, 0))
 
         return {
             "datetime": dt,

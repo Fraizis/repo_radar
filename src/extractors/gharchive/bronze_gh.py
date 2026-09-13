@@ -1,6 +1,6 @@
 """
-Запись отфильтрованных событий GitHub Archive в bronze-слой.
-Партиции Hive-style: ``gharchive/dt=YYYY-MM-DD/hour=HH/events.parquet``.
+Запись отфильтрованных событий GitHub Archive в bronze.
+Партиции: ``gharchive/dt=YYYY-MM-DD/hour=HH/events.parquet``.
 """
 
 import json
@@ -8,6 +8,7 @@ from datetime import datetime
 
 import polars as pl
 
+from extractors.bronze import hourly_hive_key, save_snapshot_parquet
 from resources.minio_resource import MinioStore
 
 GHARCHIVE_SCHEMA = {
@@ -36,16 +37,13 @@ class GitHubArchiveBronzeWriter:
         self.object_store = object_store
 
     def save_to_parquet(self, events: list[dict], dt: datetime) -> str | None:
-        if not events:
-            print("   ⚠️  Нет событий для сохранения")
-            return None
-
-        date_str = dt.strftime("%Y-%m-%d")
-        hour_str = dt.strftime("%H")
-        key = f"gharchive/dt={date_str}/hour={hour_str}/events.parquet"
-        df = pl.DataFrame(events, schema=GHARCHIVE_SCHEMA)
-        return self.object_store.put_dataframe(key, df)
-
+        return save_snapshot_parquet(
+            self.object_store,
+            events,
+            key=hourly_hive_key("gharchive", "events.parquet", dt),
+            empty_message="Нет событий для сохранения",
+            schema=GHARCHIVE_SCHEMA,
+        )
 
     def save_raw_sample(self, events: list[dict], dt: datetime) -> str:
         date_str = dt.strftime("%Y-%m-%d")

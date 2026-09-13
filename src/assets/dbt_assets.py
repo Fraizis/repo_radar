@@ -1,19 +1,17 @@
 """Asset dbt_build: CH silver_* → stg/gold через `dbt build`.
-
 Sources в transform/models/staging/_sources.yml (`silver.<table>`) читают
 таблицы ClickHouse. В lineage Dagster они должны висеть на python-барьерах
 `*_ready` (после S3Queue), а не на несуществующих AssetKey(["silver_*"]).
 """
 
-from pathlib import Path
-
 from dagster import AssetExecutionContext, AssetKey
 from dagster_dbt import DagsterDbtTranslator, DbtCliResource, DbtProject, dbt_assets
+from config.paths import TRANSFORM_DIR
 
-DBT_PROJECT_DIR = Path(__file__).parent.parent.parent / "transform"
 
-dbt_project = DbtProject(project_dir=DBT_PROJECT_DIR)
+dbt_project = DbtProject(project_dir=TRANSFORM_DIR)
 dbt_project.prepare_if_dev()
+
 
 _SOURCE_TO_UPSTREAM: dict[str, str] = {
     "silver_github_events": "silver_github_events_ready",

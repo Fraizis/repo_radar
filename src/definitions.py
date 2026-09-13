@@ -9,7 +9,7 @@ from assets.gharchive_assets import bronze_gharchive, silver_github_events_ready
 from assets.github_repos_assets import bronze_github_repos, silver_repos_ready
 from assets.optimize_assets import optimize_silver_snapshots
 from assets.osv_assets import bronze_osv, silver_advisories_ready
-from assets.silver_checks import all_silver_checks
+from checks.silver_checks import all_silver_checks
 from jobs import all_jobs, all_schedules
 from resources.clickhouse_resource import ClickHouseResource
 from resources.github_resource import GitHubResource
