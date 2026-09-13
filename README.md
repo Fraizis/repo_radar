@@ -202,6 +202,12 @@ repo_radar/
 
 ---
 
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`): ruff + pytest + dbt parse на PR и push в `main`. Локально — `make ci`.
+
+---
+
 ## Makefile
 
 | Команда                        | Действие                              |
