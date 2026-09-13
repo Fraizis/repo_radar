@@ -9,68 +9,22 @@ Chromium и вытаскивает по CSS-селекторам: version, date,
 
 from __future__ import annotations
 
-import re
 import time
 from datetime import UTC, datetime
-from pathlib import Path
 from urllib import robotparser
 from urllib.parse import urlsplit
 
 import httpx
-import yaml
 from playwright.sync_api import Error as PWError
 from playwright.sync_api import TimeoutError as PWTimeout
 from playwright.sync_api import sync_playwright
 
+from utils.http_retry import backoff_seconds
+from extractors.changelog.parsing import clean_version, parse_changelog_date
+
 USER_AGENT = "repo-radar/0.1 (changelog scraper; +https://github.com)"
 MAX_RETRIES = 4
 NAV_TIMEOUT_MS = 30_000
-
-_VERSION_RE = re.compile(
-    r"\d+\.\d+(?:\.\d+)?(?:[.\-]?(?:a|b|rc|alpha|beta|dev|post)\d*)?",
-    re.IGNORECASE,
-)
-
-# форматы дат, которые встречаются в changelog'ах
-_DATE_FORMATS = (
-    "%Y-%m-%d",
-    "%d %B %Y",
-    "%B %d, %Y",
-    "%b %d, %Y",
-    "%d %b %Y",
-)
-
-
-def load_changelog_sources(config_path: Path) -> list[dict]:
-    """Читает config/changelog_sources.yml → список источников (name/url/selectors)."""
-    with open(config_path, encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-    return list(data.get("sources") or [])
-
-
-def _clean_version(text: str | None) -> str | None:
-    """Из заголовка 'Version 3.1.0 (2024-...)' достаёт '3.1.0'."""
-    if not text:
-        return None
-    m = _VERSION_RE.search(text)
-    return m.group(0) if m else None
-
-
-def _parse_date(text: str | None) -> datetime | None:
-    """Пытается распарсить дату несколькими форматами → naive UTC (как в П4/П5)."""
-    if not text:
-        return None
-    text = text.strip()
-    iso = re.search(r"\d{4}-\d{2}-\d{2}", text)
-    candidates = ([iso.group(0)] if iso else []) + [text]
-    for cand in candidates:
-        for fmt in _DATE_FORMATS:
-            try:
-                dt = datetime.strptime(cand, fmt)
-                return dt.replace(tzinfo=UTC).replace(tzinfo=None)
-            except ValueError:
-                continue
-    return None
 
 
 class ChangelogScraper:
@@ -128,7 +82,7 @@ class ChangelogScraper:
                 page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_ms)
                 return True
             except (PWTimeout, PWError) as e:
-                sleep_s = min(2 ** attempt, 30)
+                sleep_s = backoff_seconds(attempt, cap=30.0)
                 print(f"   ⚠️  goto {url}: {e}; retry {attempt}/{MAX_RETRIES} через {sleep_s}s")
                 time.sleep(sleep_s)
         return False
@@ -179,7 +133,7 @@ class ChangelogScraper:
         rows: list[dict] = []
         for idx, el in enumerate(version_els):
             heading = (el.inner_text() or "").strip()
-            version = _clean_version(heading)
+            version = clean_version(heading)
             if not version:
                 continue
 
@@ -189,7 +143,7 @@ class ChangelogScraper:
                 "url": url,
                 "version": version,
                 "heading": heading[:512],
-                "release_date": _parse_date(raw_date),
+                "release_date": parse_changelog_date(raw_date),
                 "scraped_at": scraped_at,
             })
         return rows

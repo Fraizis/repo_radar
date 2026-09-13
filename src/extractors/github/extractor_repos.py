@@ -6,21 +6,23 @@ ClickHouse — отдельно через ``load_to_clickhouse``.
 from datetime import UTC, datetime
 from pathlib import Path
 
+from config.tracked_repos import load_repositories
+from extractors.github.repos_source import github_repos_source
+
 from extractors.github.bronze_repos import GitHubReposBronzeWriter
-from extractors.github.repos_source import github_repos_source, load_seed_repos
 from resources.minio_resource import MinioStore
 
 
 class GitHubReposExtractor:
     def __init__(
         self,
-        tracked_repos_path: Path,
+        tracked_repos_path: Path, 
         github_token: str,
         object_store: MinioStore,
         batch_size: int = 50,
     ):
         self.tracked_repos_path = tracked_repos_path
-        self.seed_repos = load_seed_repos(tracked_repos_path)
+        self.seed_repos = load_repositories(tracked_repos_path)
         self.github_token = github_token
         self.batch_size = batch_size
         self.bronze = GitHubReposBronzeWriter(object_store)

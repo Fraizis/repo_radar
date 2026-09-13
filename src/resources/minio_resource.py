@@ -87,8 +87,8 @@ class MinioStore:
 
 class MinIOResource(ConfigurableResource):
     endpoint: str = Field(default="localhost:9002")
-    access_key: str = Field(default="minioadmin")
-    secret_key: str = Field(default="minioadmin123")
+    access_key: str = Field(default="")
+    secret_key: str = Field(default="")
     bucket: str = Field(default="bronze")
     secure: bool = Field(default=False)
 

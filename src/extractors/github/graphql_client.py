@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Iterator
 from datetime import UTC, datetime
 
 import httpx
+from utils.collections import chunked
+from utils.datetime_parse import parse_iso_utc_naive
+from utils.http_retry import GRAPHQL_RETRY_STATUSES, request_json_with_retry
 
 GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
 USER_AGENT = "repo-radar/0.1 (github graphql)"
@@ -33,21 +35,6 @@ REPO_FIELDS = """
   updatedAt
   createdAt
 """
-
-
-def chunked(items: list, size: int) -> Iterator[list]:
-    for i in range(0, len(items), size):
-        yield items[i : i + size]
-
-
-def _parse_github_dt(value: str | None) -> datetime | None:
-    """ISO ``2024-01-15T10:30:00Z`` → naive UTC datetime (как в П4)."""
-    if not value:
-        return None
-    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if dt.tzinfo is not None:
-        dt = dt.astimezone(UTC).replace(tzinfo=None)
-    return dt
 
 
 class GitHubGraphQLClient:
@@ -113,34 +100,15 @@ class GitHubGraphQLClient:
         )
 
     def _post(self, query: str) -> dict:
-        last_exc: Exception | None = None
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                resp = self.http.post(
-                    GITHUB_GRAPHQL_URL,
-                    json={"query": query},
-                )
-            except httpx.HTTPError as e:
-                last_exc = e
-                sleep_s = min(2 ** attempt, 60)
-                print(f"   ⚠️  сеть: {e}; retry {attempt}/{MAX_RETRIES} через {sleep_s}s")
-                time.sleep(sleep_s)
-                continue
-
-            if resp.status_code in (403, 429, 502, 503):
-                retry_after = resp.headers.get("Retry-After")
-                sleep_s = int(retry_after) if retry_after and retry_after.isdigit() else min(2 ** attempt, 60)
-                print(
-                    f"   ⚠️  HTTP {resp.status_code}; "
-                    f"retry {attempt}/{MAX_RETRIES} через {sleep_s}s"
-                )
-                time.sleep(sleep_s)
-                continue
-
-            resp.raise_for_status()
-            return resp.json()
-
-        raise RuntimeError(f"GraphQL не ответил после {MAX_RETRIES} попыток: {last_exc}")
+        return request_json_with_retry(
+            self.http,
+            "POST",
+            GITHUB_GRAPHQL_URL,
+            json_body={"query": query},
+            max_retries=MAX_RETRIES,
+            retry_statuses=GRAPHQL_RETRY_STATUSES,
+            label="GraphQL",
+        )
 
     def _maybe_wait_rate_limit(self, rate: dict | None) -> None:
         if not rate:
@@ -178,8 +146,8 @@ class GitHubGraphQLClient:
 
     @staticmethod
     def _transform(node: dict, seed: dict) -> dict | None:
-        created_at = _parse_github_dt(node.get("createdAt"))
-        updated_at = _parse_github_dt(node.get("updatedAt")) or created_at
+        created_at = parse_iso_utc_naive(node.get("createdAt"))
+        updated_at = parse_iso_utc_naive(node.get("updatedAt")) or created_at
 
         repo_name = node.get("nameWithOwner") or f"{seed['owner']}/{seed['name']}"
 
@@ -202,7 +170,7 @@ class GitHubGraphQLClient:
             "language": language,
             "stars": node.get("stargazerCount") or 0,
             "forks": node.get("forkCount") or 0,
-            "pushed_at": _parse_github_dt(node.get("pushedAt")),
+            "pushed_at": parse_iso_utc_naive(node.get("pushedAt")),
             "updated_at": updated_at,
             "created_at": created_at,
             "ecosystem": seed.get("ecosystem") or "unknown",

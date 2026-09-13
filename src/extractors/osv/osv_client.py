@@ -8,14 +8,17 @@ API публичный, токен не нужен. Вежливый rate limit 
 
 from __future__ import annotations
 
-import json
-import time
-from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
+
+from extractors.osv.cache import cache_get, cache_put
+from utils.collections import chunked
+from utils.datetime_parse import parse_iso_utc_naive
+from utils.http_retry import request_json_with_retry
+from config.paths import OSV_CACHE_DIR
+
 
 OSV_BASE_URL = "https://api.osv.dev"
 USER_AGENT = "repo-radar/0.1 (osv)"
@@ -28,53 +31,6 @@ ECOSYSTEM_MAP = {
     "cargo": "crates.io",
     "npm": "npm",
 }
-
-
-def chunked(items: list, size: int) -> Iterator[list]:
-    for i in range(0, len(items), size):
-        yield items[i : i + size]
-
-
-def _parse_osv_dt(value: str | None) -> datetime | None:
-    """RFC3339 '2024-01-15T10:30:00Z' → naive UTC (как в П4/П5)."""
-    if not value:
-        return None
-    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if dt.tzinfo is not None:
-        dt = dt.astimezone(UTC).replace(tzinfo=None)
-    return dt
-
-
-def _cache_path(cache_dir: Path, vid: str) -> Path:
-    return cache_dir / f"{vid.replace('/', '_')}.json"
-
-
-def _cache_get(cache_dir: Path | None, vid: str, modified: str | None) -> dict | None:
-    """Вернуть детали из кэша, если файл есть и modified совпадает; иначе None."""
-    if cache_dir is None:
-        return None
-    p = _cache_path(cache_dir, vid)
-    if not p.exists():
-        return None
-    try:
-        blob = json.loads(p.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
-    if modified is not None and blob.get("modified") != modified:
-        return None
-    return blob
-
-
-def _cache_put(cache_dir: Path | None, vid: str, data: dict) -> None:
-    if cache_dir is None:
-        return
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    try:
-        _cache_path(cache_dir, vid).write_text(
-            json.dumps(data, ensure_ascii=False), encoding="utf-8"
-        )
-    except OSError:
-        pass
 
 
 class OSVClient:
@@ -95,40 +51,20 @@ class OSVClient:
         self.http.close()
 
     def _request(self, method: str, url: str, json_body: dict | None = None) -> dict:
-        last_exc: Exception | None = None
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                resp = self.http.request(method, url, json=json_body)
-            except httpx.HTTPError as e:
-                last_exc = e
-                sleep_s = min(2**attempt, 60)
-                print(f"   ⚠️  сеть: {e}; retry {attempt}/{MAX_RETRIES} через {sleep_s}s")
-                time.sleep(sleep_s)
-                continue
-
-            if resp.status_code in (429, 500, 502, 503):
-                retry_after = resp.headers.get("Retry-After")
-                sleep_s = (
-                    int(retry_after)
-                    if retry_after and retry_after.isdigit()
-                    else min(2**attempt, 60)
-                )
-                print(
-                    f"   ⚠️  HTTP {resp.status_code}; retry {attempt}/{MAX_RETRIES} через {sleep_s}s"
-                )
-                time.sleep(sleep_s)
-                continue
-
-            resp.raise_for_status()
-            return resp.json()
-
-        raise RuntimeError(f"OSV не ответил после {MAX_RETRIES} попыток: {last_exc}")
+        return request_json_with_retry(
+            self.http,
+            method,
+            url,
+            json_body=json_body,
+            max_retries=MAX_RETRIES,
+            label="OSV",
+        )
 
     def fetch_advisories(
         self,
         repos: list[dict],
         max_workers: int = 8,
-        cache_dir: Path | None = Path("data/cache/osv"),
+        cache_dir: Path | None = OSV_CACHE_DIR,
     ) -> list[dict]:
         """seed → плоские строки под silver_advisories.
         Args:
@@ -180,7 +116,7 @@ class OSVClient:
 
         to_fetch: list[str] = []
         for vid in unique_ids:
-            cached = _cache_get(cache_dir, vid, vuln_modified.get(vid))
+            cached = cache_get(cache_dir, vid, vuln_modified.get(vid))
             if cached is not None:
                 details[vid] = cached
             else:
@@ -191,7 +127,7 @@ class OSVClient:
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             for n, (vid, data) in enumerate(pool.map(self._fetch_vuln, to_fetch), start=1):
                 details[vid] = data
-                _cache_put(cache_dir, vid, data)
+                cache_put(cache_dir, vid, data)
                 if n % 100 == 0:
                     print(f"   детали {n}/{len(to_fetch)}...")
 
@@ -223,6 +159,6 @@ class OSVClient:
             "summary": vuln.get("summary"),
             "severity": severity_label,
             "cvss_vector": cvss_vector,
-            "published": _parse_osv_dt(vuln.get("published")),
-            "modified": _parse_osv_dt(vuln.get("modified")),
+            "published": parse_iso_utc_naive(vuln.get("published")),
+            "modified": parse_iso_utc_naive(vuln.get("modified")),
         }

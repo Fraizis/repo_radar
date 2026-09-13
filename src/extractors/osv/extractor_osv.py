@@ -1,10 +1,11 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
-from extractors.github.repos_source import load_seed_repos
 from extractors.osv.bronze_osv import OSVBronzeWriter
 from extractors.osv.osv_client import OSVClient
 from resources.minio_resource import MinioStore
+
+from config.tracked_repos import load_repositories
 
 
 class OSVExtractor:
@@ -14,7 +15,7 @@ class OSVExtractor:
         object_store: MinioStore,
         batch_size: int = 100,
     ):
-        self.seed_repos = load_seed_repos(tracked_repos_path)
+        self.seed_repos = load_repositories(tracked_repos_path)
         self.batch_size = batch_size
         self.bronze = OSVBronzeWriter(object_store)
 

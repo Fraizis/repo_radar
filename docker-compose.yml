@@ -15,8 +15,8 @@ services:
         condition: service_healthy
     volumes:
       - clickhouse_data:/var/lib/clickhouse
-      - ./infra/clickhouse/init:/docker-entrypoint-initdb.d
       - ./infra/clickhouse/config.d:/etc/clickhouse-server/config.d
+      - ./infra/clickhouse/users.d/s3queue.xml:/etc/clickhouse-server/users.d/s3queue.xml:ro
     healthcheck:
       test: ["CMD", "clickhouse-client", "--password", "${CLICKHOUSE_PASSWORD:-clickhouse123}", "--query", "SELECT 1"]
       interval: 10s
@@ -25,7 +25,6 @@ services:
 
   clickhouse-migrate:
     image: clickhouse/clickhouse-server:23.8-alpine
-    container_name: repo_radar_clickhouse_migrate
     depends_on:
       minio:
         condition: service_healthy
@@ -86,7 +85,6 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infra/postgres/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
@@ -95,7 +93,6 @@ services:
 
   postgres-migrate:
     image: postgres:15
-    container_name: repo_radar_postgres_migrate
     depends_on:
       postgres:
         condition: service_healthy
@@ -162,7 +159,6 @@ services:
       - ./config:/app/config
       - ./transform:/app/transform
       - ./data:/app/data
-      - ./infra/dagster/workspace.yaml:/app/.dagster/workspace.yaml:ro
       - ./infra/dagster/dagster.yaml:/app/.dagster/dagster.yaml:ro
       
   dagster-daemon:
@@ -206,7 +202,6 @@ services:
       - ./config:/app/config
       - ./transform:/app/transform
       - ./data:/app/data
-      - ./infra/dagster/workspace.yaml:/app/.dagster/workspace.yaml:ro
       - ./infra/dagster/dagster.yaml:/app/.dagster/dagster.yaml:ro
 
   metabase:

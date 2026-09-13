@@ -3,22 +3,9 @@ dlt-source: GitHub GraphQL → строки репозиториев из seed.
 Не пишет в destination сам: экстрактор итерирует resource и кладёт parquet.
 """
 
-from pathlib import Path
-
 import dlt
-import yaml
 
 from extractors.github.graphql_client import GitHubGraphQLClient
-
-
-def load_seed_repos(tracked_repos_path: Path) -> list[dict]:
-    """Читает ``config/tracked_repos.yml`` как список dict (owner/name/...).
-    В отличие от ``events_gh.load_tracked_repos`` (там set ``owner/name``),
-    здесь нужны отдельные поля — GraphQL принимает owner и name по отдельности.
-    """
-    with open(tracked_repos_path, encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-    return list(data.get("repositories") or [])
 
 
 @dlt.source(name="github_graphql")

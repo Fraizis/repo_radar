@@ -1,12 +1,11 @@
-"""
-Запись снимка уязвимостей OSV в bronze.
+"""Запись снимка уязвимостей OSV в bronze.
+
 Hive-путь: ``osv/dt=YYYY-MM-DD/advisories_<ts>.parquet``.
 """
 
 from datetime import datetime
 
-import polars as pl
-
+from extractors.bronze import daily_hive_key, save_snapshot_parquet
 from resources.minio_resource import MinioStore
 
 
@@ -15,14 +14,11 @@ class OSVBronzeWriter:
         self.object_store = object_store
 
     def save_to_parquet(self, rows: list[dict], dt: datetime) -> str | None:
-        if not rows:
-            print("   ⚠️  Нет уязвимостей для сохранения")
-            return None
-
-        date_str = dt.strftime("%Y-%m-%d")
-        ts = int(dt.timestamp())
-        key = f"osv/dt={date_str}/advisories_{ts}.parquet"
-        df = pl.DataFrame(rows)
-        return self.object_store.put_dataframe(key, df)
+        return save_snapshot_parquet(
+            self.object_store,
+            rows,
+            key=daily_hive_key("osv", "advisories", dt),
+            empty_message="Нет уязвимостей для сохранения",
+        )
 
 

@@ -10,30 +10,10 @@ import sys
 import time
 from collections.abc import Callable
 
+from utils.formatting import format_duration, format_size
+
 """Сигнатура колбэка прогресса: (скачано байт, ожидаемый размер или None)."""
 ProgressCallback = Callable[[int, int | None], None]
-
-
-def format_size(num_bytes: float) -> str:
-    """Человекочитаемый размер: 1536 → '1.5 KB'."""
-    value = float(num_bytes)
-    for unit in ("B", "KB", "MB", "GB"):
-        if abs(value) < 1024 or unit == "GB":
-            return f"{value:.1f} {unit}"
-        value /= 1024
-    return f"{value:.1f} GB"
-
-
-def format_duration(seconds: float) -> str:
-    """Секунды → 'MM:SS' (или 'HH:MM:SS' для длинных загрузок)."""
-    if seconds != seconds or seconds in (float("inf"), float("-inf")):
-        return "--:--"
-    total = int(max(seconds, 0))
-    hours, remainder = divmod(total, 3600)
-    minutes, secs = divmod(remainder, 60)
-    if hours:
-        return f"{hours:d}:{minutes:02d}:{secs:02d}"
-    return f"{minutes:02d}:{secs:02d}"
 
 
 class ConsoleDownloadProgress:

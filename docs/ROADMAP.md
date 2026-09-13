@@ -202,6 +202,7 @@ Dagster (оркестрация)
   - **Language Trends** — популярность языков
   - **CVE Exposure** — репозитории с уязвимостями
 
+- [x] Аллерты в Slack
 - [x] CI/CD: `ruff` + `dbt parse` + pytest
 
 **Задачи автоматизации:**

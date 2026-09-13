@@ -1,0 +1,9 @@
+<clickhouse>
+  <profiles>
+    <default>
+      <allow_experimental_s3queue>1</allow_experimental_s3queue>
+    </default>
+  </profiles>
+</clickhouse>
+
+
