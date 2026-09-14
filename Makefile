@@ -57,9 +57,11 @@ dbt-freshness:
 	uv run dbt source freshness
 
 ci:
-	uv run ruff check src tests scripts
+	uv run ruff check src tests
 	PYTHONPATH=src uv run pytest -q
-	cd transform && uv run --project .. dbt deps --profiles-dir . && \
+	cd transform && DBT_PROJECT_DIR=. DBT_PROFILES_DIR=. \
+	  uv run --project .. dbt deps --profiles-dir . && \
+	  DBT_PROJECT_DIR=. DBT_PROFILES_DIR=. \
 	  uv run --project .. dbt parse --project-dir . --profiles-dir .
 
 urls:

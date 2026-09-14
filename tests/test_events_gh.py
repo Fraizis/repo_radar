@@ -1,10 +1,7 @@
 from pathlib import Path
 
-from extractors.gharchive.events_gh import (
-    ALLOWED_EVENT_TYPES,
-    load_tracked_repos,
-    transform_event,
-)
+from config.tracked_repos import load_tracked_repos
+from extractors.gharchive.events_gh import ALLOWED_EVENT_TYPES, transform_event
 
 
 def test_allowed_event_types_not_empty():
