@@ -13,12 +13,11 @@ from pathlib import Path
 
 import httpx
 
+from config.paths import OSV_CACHE_DIR
 from extractors.osv.cache import cache_get, cache_put
 from utils.collections import chunked
 from utils.datetime_parse import parse_iso_utc_naive
 from utils.http_retry import request_json_with_retry
-from config.paths import OSV_CACHE_DIR
-
 
 OSV_BASE_URL = "https://api.osv.dev"
 USER_AGENT = "repo-radar/0.1 (osv)"

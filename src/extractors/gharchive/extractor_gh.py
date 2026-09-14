@@ -14,8 +14,6 @@ from extractors.gharchive.events_gh import filter_events, read_events, transform
 from extractors.gharchive.progress_gh import ProgressCallback
 from resources.minio_resource import MinioStore
 
-from config.tracked_repos import load_tracked_repos  
-
 RAW_SAMPLE_SIZE = 100
 
 

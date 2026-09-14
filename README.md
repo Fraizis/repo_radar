@@ -227,4 +227,3 @@ GitHub Actions (`.github/workflows/ci.yml`): ruff + pytest + dbt parse на PR �
 Проект выполнил: Вавилов Д.В. 
 @Fraizis
 
-- [`docs/METABASE_DASHBOARDS.md`](docs/METABASE_DASHBOARDS.md) — дашборды

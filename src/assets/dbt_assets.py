@@ -6,7 +6,6 @@ Sources в transform/models/staging/_sources.yml (`silver.<table>`) читают
 
 from dagster import AssetExecutionContext, AssetKey
 from dagster_dbt import DagsterDbtTranslator, DbtCliResource, DbtProject, dbt_assets
-from config.paths import TRANSFORM_DIR
 
 from config.paths import TRANSFORM_DIR
 
