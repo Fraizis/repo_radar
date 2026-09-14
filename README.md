@@ -137,6 +137,21 @@ Jobs / schedules / checks — `src/jobs.py`, `src/checks/silver_checks.py`.
 ### 4. Metabase
 
 [http://localhost:3000](http://localhost:3000) — первый запуск: создать админа, подключить ClickHouse (хост `clickhouse`, порт `8123`). SQL дашбордов — в `docs/METABASE_DASHBOARDS.md`.
+## Дашборды
+
+SQL карточек — `[docs/METABASE_DASHBOARDS.md](docs/METABASE_DASHBOARDS.md)`.
+
+### Repo pulse
+
+![](docs/images/repo_pulse.png)
+
+### Language trends
+
+![](docs/images/language_trends.png)
+
+### Rising repos
+
+![](docs/images/rising_repos.png)
 
 
 ### 5. Slack-алерты (опционально)
