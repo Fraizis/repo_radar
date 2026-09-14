@@ -113,5 +113,5 @@ def ensure_gharchive_hour(
             "loaded_via": MetadataValue.text("s3_insert"),
         },
     )
-    
+
 

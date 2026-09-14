@@ -5,10 +5,10 @@ from dagster import AssetExecutionContext, MetadataValue, Output, asset
 from assets._common import attach_baseline, bronze_output, read_silver_baseline
 from assets.partitions import gharchive_partitions, partition_dt
 from config.paths import DOWNLOAD_DIR, TRACKED_REPOS_YAML
+from extractors.gharchive.clickhouse_load import ensure_gharchive_hour
 from extractors.gharchive.extractor_gh import GitHubArchiveExtractor
 from resources.clickhouse_resource import ClickHouseResource
 from resources.minio_resource import MinIOResource
-from extractors.gharchive.clickhouse_load import ensure_gharchive_hour
 
 
 @asset(

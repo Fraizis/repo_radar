@@ -9,7 +9,6 @@ import json
 from collections.abc import Iterator
 from pathlib import Path
 
-
 """Типы событий, которые попадают в bronze/silver. Остальные отбрасываются."""
 ALLOWED_EVENT_TYPES = {
     "WatchEvent",

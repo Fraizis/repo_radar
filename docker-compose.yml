@@ -205,8 +205,7 @@ services:
       - ./infra/dagster/dagster.yaml:/app/.dagster/dagster.yaml:ro
 
   metabase:
-    image: metabase/metabase:v0.56.12
-    profiles: ["metabase"]
+    image: metabase/metabase:v0.56.12 
     container_name: repo_radar_metabase
     ports:
       - "3000:3000"
