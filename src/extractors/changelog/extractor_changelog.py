@@ -6,11 +6,13 @@ ClickHouse — отдельно через load_to_clickhouse (ReplacingMergeTre
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from config.changelog_sources import load_changelog_sources
-from extractors.changelog.bronze_changelog import ChangelogBronzeWriter
-from extractors.changelog.changelog_client import ChangelogScraper
-from extractors.changelog.checkpoint import ChangelogCheckpoint
 from resources.minio_resource import MinioStore
+
+from config.changelog_sources import load_changelog_sources
+from extractors.changelog.changelog_client import ChangelogScraper
+from extractors.changelog.bronze_changelog import ChangelogBronzeWriter
+from extractors.changelog.checkpoint import ChangelogCheckpoint
+
 
 
 class ChangelogExtractor:

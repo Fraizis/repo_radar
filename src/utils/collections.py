@@ -3,12 +3,16 @@
 Общие хелперы без доменной логики. Сейчас используется клиентами
 GitHub GraphQL и OSV для нарезки seed/querybatch на батчи.
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
+from typing import TypeVar
+
+T = TypeVar("T")
 
 
-def chunked[T](items: Sequence[T], size: int) -> Iterator[list[T]]:
+def chunked(items: Sequence[T], size: int) -> Iterator[list[T]]:
     """Режет последовательность на куски фиксированного размера.
 
     Последний кусок может быть короче ``size``. Пустой ``items`` → пустой
