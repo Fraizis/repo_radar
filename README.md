@@ -222,8 +222,7 @@ GitHub Actions (`.github/workflows/ci.yml`): ruff + pytest + dbt parse на PR �
 | `make ci`                      | ruff + pytest + dbt parse             |
 | `make urls`                    | Печать URL сервисов                   | 
 
-####
-
+--------------------------
 
 Проект выполнил: Вавилов Д.В. 
 @Fraizis
