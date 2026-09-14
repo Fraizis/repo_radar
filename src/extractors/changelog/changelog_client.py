@@ -19,8 +19,8 @@ from playwright.sync_api import Error as PWError
 from playwright.sync_api import TimeoutError as PWTimeout
 from playwright.sync_api import sync_playwright
 
-from utils.http_retry import backoff_seconds
 from extractors.changelog.parsing import clean_version, parse_changelog_date
+from utils.http_retry import backoff_seconds
 
 USER_AGENT = "repo-radar/0.1 (changelog scraper; +https://github.com)"
 MAX_RETRIES = 4

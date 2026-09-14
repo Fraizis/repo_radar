@@ -7,16 +7,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from config.tracked_repos import load_repositories
-from extractors.github.repos_source import github_repos_source
-
 from extractors.github.bronze_repos import GitHubReposBronzeWriter
+from extractors.github.repos_source import github_repos_source
 from resources.minio_resource import MinioStore
 
 
 class GitHubReposExtractor:
     def __init__(
         self,
-        tracked_repos_path: Path, 
+        tracked_repos_path: Path,
         github_token: str,
         object_store: MinioStore,
         batch_size: int = 50,

@@ -7,13 +7,12 @@
 from datetime import datetime
 from pathlib import Path
 
+from config.tracked_repos import load_tracked_repos
 from extractors.gharchive.bronze_gh import GitHubArchiveBronzeWriter
 from extractors.gharchive.download_gh import GitHubArchiveDownloader
 from extractors.gharchive.events_gh import filter_events, read_events, transform_event
 from extractors.gharchive.progress_gh import ProgressCallback
 from resources.minio_resource import MinioStore
-
-from config.tracked_repos import load_tracked_repos  
 
 RAW_SAMPLE_SIZE = 100
 

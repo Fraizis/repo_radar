@@ -8,16 +8,14 @@ from dagster import (
 )
 
 from assets.changelog_assets import bronze_changelogs, silver_changelogs_ready
-
-from assets.partitions import gharchive_partitions
 from assets.gharchive_assets import (
-    bronze_gharchive, 
+    bronze_gharchive,
     silver_github_events_ready,
 )
 from assets.github_repos_assets import bronze_github_repos, silver_repos_ready
 from assets.optimize_assets import optimize_silver_snapshots
 from assets.osv_assets import bronze_osv, silver_advisories_ready
-
+from assets.partitions import gharchive_partitions
 
 gharchive_job = define_asset_job(
     name="gharchive_job",
